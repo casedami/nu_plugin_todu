@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "crates/todu-db",
+    "crates/todu-plugin",
+    "crates/nu-plugin-todu",
+]
+resolver = "2"
+
+[workspace.lints.rust]
+missing_docs = "warn"

@@ -1,0 +1,15 @@
+[package]
+name = "nu-plugin-todu"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "nu_plugin_todu"
+path = "src/main.rs"
+
+[dependencies]
+todu-plugin = { path = "../todu-plugin" }
+nu-plugin = "0.113.0"
+
+[lints]
+workspace = true

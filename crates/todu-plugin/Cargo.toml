@@ -1,0 +1,18 @@
+[package]
+name = "todu-plugin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+todu-db = { path = "../todu-db" }
+chrono = "0.4"
+chrono-english = "0.1.8"
+nu-ansi-term = "0.50"
+nu-plugin = "0.113.0"
+nu-protocol = { version = "0.113.0", features = ["plugin"] }
+
+[dev-dependencies]
+rstest = "0.23"
+
+[lints]
+workspace = true

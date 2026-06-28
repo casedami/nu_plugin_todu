@@ -1,0 +1,18 @@
+[package]
+name = "todu-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nu-ansi-term = "0.50"
+nu-protocol = { version = "0.113.0", features = ["plugin"] }
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+typetag = "0.2"
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
+
+[dev-dependencies]
+rstest = "0.23"
+
+[lints]
+workspace = true
