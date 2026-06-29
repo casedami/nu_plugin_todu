@@ -3,6 +3,8 @@
 mod commands;
 mod config;
 mod parse;
+#[cfg(feature = "remote")]
+mod remote;
 
 pub(crate) use parse::{parse_due, parse_inline};
 
@@ -121,6 +123,18 @@ impl Plugin for ToduPlugin {
             Box::new(ToduTag),
             Box::new(ToduRm),
             Box::new(ToduClear),
+            #[cfg(feature = "remote")]
+            Box::new(ToduRemoteList),
+            #[cfg(feature = "remote")]
+            Box::new(ToduRemoteAddGitHub),
+            #[cfg(feature = "remote")]
+            Box::new(ToduRemoteAddJira),
+            #[cfg(feature = "remote")]
+            Box::new(ToduRemoteRm),
+            #[cfg(feature = "remote")]
+            Box::new(ToduPullGitHub),
+            #[cfg(feature = "remote")]
+            Box::new(ToduPullJira),
         ]
     }
 }

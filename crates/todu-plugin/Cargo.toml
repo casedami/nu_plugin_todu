@@ -3,6 +3,9 @@ name = "todu-plugin"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+remote = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:keyring", "todu-db/remote"]
+
 [dependencies]
 todu-db = { path = "../todu-db" }
 chrono = "0.4"
@@ -10,6 +13,10 @@ chrono-english = "0.1.8"
 nu-ansi-term = "0.50"
 nu-plugin = "0.113.0"
 nu-protocol = { version = "0.113.0", features = ["plugin"] }
+reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false, optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+keyring = { version = "3", optional = true }
 
 [dev-dependencies]
 rstest = "0.23"

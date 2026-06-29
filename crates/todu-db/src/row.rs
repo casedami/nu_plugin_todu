@@ -83,12 +83,12 @@ impl ToduRow {
                 None => render_empty(span),
             },
         );
+        rec.push(
+            "source",
+            Value::string(self.source.short_label(), span),
+        );
 
         if long {
-            rec.push(
-                "source",
-                Value::string(self.source.label().to_string(), span),
-            );
             rec.push("created", Value::date(self.created.fixed_offset(), span));
         }
 

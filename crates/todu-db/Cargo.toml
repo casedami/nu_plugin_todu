@@ -3,6 +3,9 @@ name = "todu-db"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+remote = []
+
 [dependencies]
 nu-ansi-term = "0.50"
 nu-protocol = { version = "0.113.0", features = ["plugin"] }

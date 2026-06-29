@@ -15,7 +15,11 @@ fn apply_status(
     plugin.with_project(engine, call, |db, proj| {
         for id in &ids {
             assert_todo_exists(db, *id, proj, call.head)?;
+            #[cfg(feature = "remote")]
+            let row = db.get_todo(*id, proj).map_err(db_err)?;
             db.set_todo_status(*id, proj, status).map_err(db_err)?;
+            #[cfg(feature = "remote")]
+            crate::remote::push_status(engine, row.source, row.tag.as_deref(), status)?;
         }
         Ok(PipelineData::Empty)
     })

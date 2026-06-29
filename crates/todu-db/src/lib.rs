@@ -1,17 +1,23 @@
 //! SQLite-backed persistence layer and shared domain types
 
 mod priority;
+#[cfg(feature = "remote")]
+mod remote;
 mod row;
 mod source;
 mod status;
 
 pub use priority::ToduPriority;
+#[cfg(feature = "remote")]
+pub use remote::ToduRemote;
 pub use row::ToduRow;
 pub use source::ToduSource;
 pub use status::ToduStatus;
 
 use chrono::NaiveDate;
 use nu_protocol::ast::{Comparison, Operator};
+#[cfg(feature = "remote")]
+use rusqlite::OptionalExtension;
 use rusqlite::{params, Connection, Result as SqlResult};
 use std::collections::HashMap;
 use std::path::Path;
@@ -73,6 +79,15 @@ impl ToduLocalDatabase {
                 deleted_at  INTEGER
             );",
         )?;
+        #[cfg(feature = "remote")]
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS remotes (
+                project     TEXT NOT NULL,
+                type        TEXT NOT NULL,
+                url         TEXT NOT NULL,
+                PRIMARY KEY (project, type, url)
+            );",
+        )?;
         Ok(Self { conn })
     }
 
@@ -127,7 +142,6 @@ impl ToduLocalDatabase {
         self.sync_parent_status(ptid, project)
     }
 
-    /// Recursively updates the parent's derived status based on its children
     fn sync_parent_status(&self, ptid: i64, project: &str) -> SqlResult<()> {
         let pptid: Option<i64> = self.conn.query_row(
             "SELECT pptid FROM todos WHERE ptid = ?1 AND project = ?2",
@@ -180,6 +194,71 @@ impl ToduLocalDatabase {
             params![project, todo.task, todo.priority, todo.due, todo.desc, next_ptid, todo.pptid, todo.tag, todo.source.label()],
         )?;
         self.get_todo(next_ptid, project)
+    }
+
+    /// Returns the first non-deleted todo in `project` with the given `tag` and `source`, or `None`
+    #[cfg(feature = "remote")]
+    pub fn find_todo_by_tag_and_source(
+        &self,
+        project: &str,
+        tag: &str,
+        source: ToduSource,
+    ) -> SqlResult<Option<ToduRow>> {
+        let sql = format!(
+            "SELECT {} FROM todos WHERE project = ?1 AND tag = ?2 AND source = ?3 AND deleted_at IS NULL LIMIT 1",
+            ToduRow::COLS
+        );
+        self.conn
+            .prepare(&sql)?
+            .query_row(params![project, tag, source.label()], ToduRow::from_sql)
+            .optional()
+    }
+
+    /// Returns all configured remotes for `project`, optionally filtered to `remote_type`
+    #[cfg(feature = "remote")]
+    pub fn get_remotes(
+        &self,
+        project: &str,
+        remote_type: Option<&str>,
+    ) -> SqlResult<Vec<ToduRemote>> {
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match remote_type {
+            Some(t) => (
+                "SELECT type, url FROM remotes WHERE project = ?1 AND type = ?2 ORDER BY type, url".to_owned(),
+                vec![Box::new(project.to_owned()), Box::new(t.to_owned())],
+            ),
+            None => (
+                "SELECT type, url FROM remotes WHERE project = ?1 ORDER BY type, url".to_owned(),
+                vec![Box::new(project.to_owned())],
+            ),
+        };
+        self.conn
+            .prepare(&sql)?
+            .query_map(rusqlite::params_from_iter(params), |row| {
+                Ok(ToduRemote {
+                    remote_type: row.get(0)?,
+                    url: row.get(1)?,
+                })
+            })?
+            .collect()
+    }
+
+    /// Adds a remote for `project`. Returns `true` if inserted, `false` if it already existed
+    #[cfg(feature = "remote")]
+    pub fn add_remote(&self, project: &str, remote_type: &str, url: &str) -> SqlResult<bool> {
+        let n = self.conn.execute(
+            "INSERT OR IGNORE INTO remotes (project, type, url) VALUES (?1, ?2, ?3)",
+            params![project, remote_type, url],
+        )?;
+        Ok(n > 0)
+    }
+
+    /// Removes a remote for `project`. Returns the number of rows deleted (0 if not found)
+    #[cfg(feature = "remote")]
+    pub fn remove_remote(&self, project: &str, remote_type: &str, url: &str) -> SqlResult<usize> {
+        self.conn.execute(
+            "DELETE FROM remotes WHERE project = ?1 AND type = ?2 AND url = ?3",
+            params![project, remote_type, url],
+        )
     }
 
     /// Updates the tag on todo `ptid`

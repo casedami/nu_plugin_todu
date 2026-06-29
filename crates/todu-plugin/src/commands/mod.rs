@@ -3,6 +3,10 @@ mod clear;
 mod edit;
 mod list;
 mod rm;
+#[cfg(feature = "remote")]
+mod pull;
+#[cfg(feature = "remote")]
+mod remote;
 mod status;
 
 pub use add::ToduAdd;
@@ -10,6 +14,10 @@ pub use clear::ToduClear;
 pub use edit::{ToduDesc, ToduDue, ToduTag};
 pub use list::ToduList;
 pub use rm::ToduRm;
+#[cfg(feature = "remote")]
+pub use pull::{ToduPullGitHub, ToduPullJira};
+#[cfg(feature = "remote")]
+pub use remote::{ToduRemoteAddGitHub, ToduRemoteAddJira, ToduRemoteList, ToduRemoteRm};
 pub use status::{ToduDone, ToduPause, ToduReopen, ToduStart, ToduStop};
 
 use nu_plugin::EvaluatedCall;

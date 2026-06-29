@@ -115,6 +115,17 @@ impl PluginCommand for ToduTag {
             };
             for (id, span) in &ids {
                 assert_todo_exists(db, *id, proj, *span)?;
+                #[cfg(feature = "remote")]
+                {
+                    let row = db.get_todo(*id, proj).map_err(db_err)?;
+                    if row.source != todu_db::ToduSource::Local {
+                        return Err(LabeledError::new(format!(
+                            "todo #{id} originates from {} — its tag is the issue identifier and cannot be changed",
+                            row.source.label()
+                        ))
+                        .with_label("remote todo", *span));
+                    }
+                }
                 db.update_tag(*id, proj, tag_val).map_err(db_err)?;
             }
             Ok(())
