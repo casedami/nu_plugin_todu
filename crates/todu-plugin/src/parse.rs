@@ -35,7 +35,7 @@ pub fn parse_inline(input: &str) -> Result<ParsedTodu, LabeledError> {
     let mut priority: Option<ToduPriority> = None;
     let mut due_result: Option<Result<Option<NaiveDate>, LabeledError>> = None;
 
-    let task: String = task_part
+    let title: String = task_part
         .trim_start_matches(char::is_whitespace)
         .split_whitespace()
         .filter_map(|token| {
@@ -89,7 +89,7 @@ pub fn parse_inline(input: &str) -> Result<ParsedTodu, LabeledError> {
     };
 
     Ok(ParsedTodu {
-        task,
+        title,
         priority: priority.unwrap_or(ToduPriority::Unset),
         due,
         desc: desc_part.to_string(),
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn basic_task() {
         let item = parse_inline("buy milk").unwrap();
-        assert_eq!(item.task, "buy milk");
+        assert_eq!(item.title, "buy milk");
         assert_eq!(item.priority, ToduPriority::Unset);
         assert_eq!(item.desc, "");
         assert_eq!(item.due, None);
@@ -171,39 +171,39 @@ mod tests {
 
     #[test]
     fn empty_tag_keeps_token_in_task() {
-        assert_eq!(parse_inline("task #").unwrap().task, "task #");
+        assert_eq!(parse_inline("task #").unwrap().title, "task #");
     }
 
     #[test]
     fn empty_parent_keeps_token_in_task() {
-        assert_eq!(parse_inline("task ^").unwrap().task, "task ^");
+        assert_eq!(parse_inline("task ^").unwrap().title, "task ^");
     }
 
     #[test]
     fn inline_desc() {
         let item = parse_inline("task // my description").unwrap();
-        assert_eq!(item.task, "task");
+        assert_eq!(item.title, "task");
         assert_eq!(item.desc, "my description");
     }
 
     #[test]
     fn due_in_task() {
         let item = parse_inline("task @2026-07-01").unwrap();
-        assert_eq!(item.task, "task");
+        assert_eq!(item.title, "task");
         assert_eq!(item.due, parse_due("2026-07-01").unwrap());
     }
 
     #[test]
     fn due_natural_language() {
         let item = parse_inline("task @friday").unwrap();
-        assert_eq!(item.task, "task");
+        assert_eq!(item.title, "task");
         assert!(item.due.is_some());
     }
 
     #[test]
     fn at_in_desc_is_literal() {
         let item = parse_inline("task // description @2026-07-01").unwrap();
-        assert_eq!(item.task, "task");
+        assert_eq!(item.title, "task");
         assert_eq!(item.desc, "description @2026-07-01");
         assert_eq!(item.due, None);
     }
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn combined_tokens() {
         let item = parse_inline("task !! #work ^2 // some desc").unwrap();
-        assert_eq!(item.task, "task");
+        assert_eq!(item.title, "task");
         assert_eq!(item.priority, ToduPriority::Medium);
         assert_eq!(item.tag.as_deref(), Some("work"));
         assert_eq!(item.pptid, Some(2));
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn priority_token_with_due() {
         let item = parse_inline("task !!! @tomorrow").unwrap();
-        assert_eq!(item.task, "task");
+        assert_eq!(item.title, "task");
         assert_eq!(item.priority, ToduPriority::High);
         assert!(item.due.is_some());
     }
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn priority_prefix_attached_to_word() {
         let item = parse_inline("!!!test @tomorrow").unwrap();
-        assert_eq!(item.task, "test");
+        assert_eq!(item.title, "test");
         assert_eq!(item.priority, ToduPriority::High);
         assert!(item.due.is_some());
     }

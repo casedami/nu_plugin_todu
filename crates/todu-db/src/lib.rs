@@ -39,8 +39,8 @@ fn compare_ordering(ord: Ordering, operator: Operator) -> Option<bool> {
 
 /// Intermediary struct between user input and the database
 pub struct ParsedTodu {
-    /// Task item
-    pub task: String,
+    /// Task title
+    pub title: String,
     /// Task priority
     pub priority: ToduPriority,
     /// Task due date
@@ -67,7 +67,7 @@ impl ToduLocalDatabase {
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 ptid        INTEGER NOT NULL DEFAULT 0,
                 project     TEXT    NOT NULL,
-                task        TEXT    NOT NULL,
+                title       TEXT    NOT NULL,
                 status      TEXT    NOT NULL DEFAULT 'pending',
                 priority    TEXT    NOT NULL DEFAULT 'unset',
                 due         TEXT,
@@ -189,9 +189,9 @@ impl ToduLocalDatabase {
             |row| row.get(0),
         )?;
         self.conn.execute(
-            "INSERT INTO todos (project, task, priority, status, due, desc, ptid, pptid, created, tag, source)
+            "INSERT INTO todos (project, title, priority, status, due, desc, ptid, pptid, created, tag, source)
              VALUES (?1, ?2, ?3, 'pending', ?4, ?5, ?6, ?7, unixepoch('now'), ?8, ?9)",
-            params![project, todo.task, todo.priority, todo.due, todo.desc, next_ptid, todo.pptid, todo.tag, todo.source.label()],
+            params![project, todo.title, todo.priority, todo.due, todo.desc, next_ptid, todo.pptid, todo.tag, todo.source.label()],
         )?;
         self.get_todo(next_ptid, project)
     }

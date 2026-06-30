@@ -13,6 +13,7 @@ pub enum ToduSource {
 
 impl ToduSource {
     /// Parses a source string from the database
+    #[cfg_attr(not(feature = "remote"), allow(unused_variables))]
     pub(crate) fn from_str(s: &str) -> Self {
         #[cfg(feature = "remote")]
         if let Some(url) = s.strip_prefix("github:") {

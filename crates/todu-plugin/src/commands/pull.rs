@@ -119,7 +119,7 @@ impl SimplePluginCommand for ToduPullGitHub {
                         .insert_todo(
                             proj,
                             &ParsedTodu {
-                                task: issue.title,
+                                title: issue.title,
                                 priority: ToduPriority::Unset,
                                 due: None,
                                 desc: issue.body.unwrap_or_default(),
@@ -282,7 +282,7 @@ impl SimplePluginCommand for ToduPullJira {
                         .insert_todo(
                             proj,
                             &ParsedTodu {
-                                task: issue.fields.summary,
+                                title: issue.fields.summary,
                                 priority: ToduPriority::Unset,
                                 due: None,
                                 desc: String::new(),

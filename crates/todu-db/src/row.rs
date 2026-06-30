@@ -12,8 +12,8 @@ const TRUNCATED: &str = "...";
 pub struct ToduRow {
     /// Project-scoped unique ID (monotonically increasing per project).
     pub ptid: i64,
-    /// Task item
-    pub task: String,
+    /// Task title
+    pub title: String,
     /// Task status
     pub status: ToduStatus,
     /// Task priority level
@@ -36,7 +36,7 @@ pub struct ToduRow {
 
 impl ToduRow {
     pub(super) const COLS: &'static str =
-        "ptid, priority, status, task, due, desc, pptid, created, tag, source";
+        "ptid, priority, status, title, due, desc, pptid, created, tag, source";
 
     /// Deserializes a SQLite row into a `ToduRow`
     pub(super) fn from_sql(row: &Row) -> SqlResult<Self> {
@@ -44,7 +44,7 @@ impl ToduRow {
             ptid: row.get(0)?,
             priority: row.get(1)?,
             status: row.get(2)?,
-            task: row.get(3)?,
+            title: row.get(3)?,
             due: row.get(4)?,
             desc: row.get(5)?,
             pptid: row.get(6)?,
@@ -61,7 +61,7 @@ impl ToduRow {
         let mut rec = Record::new();
 
         rec.push("index", Value::int(self.ptid, span));
-        rec.push("task", Value::string(self.task.clone(), span));
+        rec.push("title", Value::string(self.title.clone(), span));
         rec.push("status", render_status(&self.status, span));
         rec.push("priority", render_priority(&self.priority, span));
         rec.push(
@@ -83,10 +83,7 @@ impl ToduRow {
                 None => render_empty(span),
             },
         );
-        rec.push(
-            "source",
-            Value::string(self.source.short_label(), span),
-        );
+        rec.push("source", Value::string(self.source.short_label(), span));
 
         if long {
             rec.push("created", Value::date(self.created.fixed_offset(), span));
@@ -127,7 +124,7 @@ fn render_due(date: &Option<NaiveDate>, span: Span) -> Value {
         None => render_empty(span),
         Some(date) if is_overdue(*date) => Value::string(
             Color::LightRed
-                .italic()
+                .underline()
                 .paint(date.format("%Y-%m-%d").to_string())
                 .to_string(),
             span,
@@ -147,8 +144,8 @@ fn is_overdue(date: NaiveDate) -> bool {
 fn render_priority(priority: &ToduPriority, span: Span) -> Value {
     let label = priority.label();
     let colored = match priority {
-        ToduPriority::High => Color::Red.bold().paint(label),
-        ToduPriority::Medium => Color::Yellow.paint(label),
+        ToduPriority::High => Color::LightRed.bold().paint(label),
+        ToduPriority::Medium => Color::LightYellow.paint(label),
         ToduPriority::Low => Style::new().paint(label),
         ToduPriority::Unset => Style::new().dimmed().paint(label),
     };
@@ -158,12 +155,12 @@ fn render_priority(priority: &ToduPriority, span: Span) -> Value {
 fn render_status(status: &ToduStatus, span: Span) -> Value {
     let label = status.label();
     let colored = match status {
-        ToduStatus::InProgress => Color::Cyan.italic().paint(label),
-        ToduStatus::InReview => Color::Magenta.underline().paint(label),
+        ToduStatus::InProgress => Style::new().italic().paint(label),
+        ToduStatus::InReview => Color::LightMagenta.underline().paint(label),
         ToduStatus::Pending => Style::new().paint(label),
         ToduStatus::Paused => Style::new().dimmed().paint(label),
         ToduStatus::Stopped => Style::new().dimmed().strikethrough().paint(label),
-        ToduStatus::Done => Color::Green.strikethrough().paint(label),
+        ToduStatus::Done => Color::LightGreen.strikethrough().paint(label),
     };
     Value::string(colored.to_string(), span)
 }
