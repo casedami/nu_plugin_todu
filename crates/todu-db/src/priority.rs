@@ -10,21 +10,21 @@ use std::cmp::Ordering;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ToduPriority {
     /// High priority @!!!
-    High = 0,
+    High,
     /// Medium priority @!!
-    Medium = 1,
+    Medium,
     /// Low priority @!
-    Low = 2,
+    Low,
     /// No priority
-    Unset = 3,
+    Unset,
 }
 
 impl From<u8> for ToduPriority {
     fn from(n: u8) -> Self {
         match n {
-            0 => Self::High,
-            1 => Self::Medium,
-            2 => Self::Low,
+            3 => Self::High,
+            2 => Self::Medium,
+            1 => Self::Low,
             _ => Self::Unset,
         }
     }

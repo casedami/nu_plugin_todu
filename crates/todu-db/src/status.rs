@@ -1,3 +1,4 @@
+use nu_ansi_term::{Color, Style};
 use nu_protocol::{ast::Operator, CustomValue, ShellError, Span, Value};
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 
@@ -10,31 +11,44 @@ use std::cmp::Ordering;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ToduStatus {
     /// Task has been started
-    InProgress = 1,
-    /// Parent task with all children tasks marked as `Done`
-    InReview = 2,
+    InProgress,
     /// Task has not been started yet
-    Pending = 3,
-    /// Taak has been paused and is no longer in progress
-    Paused = 4,
+    Pending,
+    /// Parent task with all children tasks marked as `Done`
+    InReview,
+    /// Task has been paused and is no longer in progress
+    Paused,
     /// Task is no longer being pursued
-    Stopped = 5,
+    Stopped,
     /// Task has been finished
-    Done = 6,
+    Done,
+}
+
+impl From<u8> for ToduStatus {
+    fn from(n: u8) -> Self {
+        match n {
+            5 => Self::InProgress,
+            4 => Self::Pending,
+            3 => Self::InReview,
+            2 => Self::Paused,
+            1 => Self::Stopped,
+            _ => Self::Done,
+        }
+    }
 }
 
 impl ToduStatus {
-    /// Parses a status string (accepts both hyphenated and underscore forms). Defaults to `Pending`.
-    pub(crate) fn from_str(s: &str) -> Self {
-        match s {
+    /// Parses a status string (accepts both hyphenated and underscore forms). Returns `None` for unrecognised values.
+    pub(crate) fn from_str(s: &str) -> Option<Self> {
+        Some(match s {
             "in_progress" | "in-progress" => Self::InProgress,
             "in_review" | "in-review" => Self::InReview,
             "pending" => Self::Pending,
             "paused" => Self::Paused,
             "stopped" => Self::Stopped,
             "done" => Self::Done,
-            _ => Self::Pending,
-        }
+            _ => return None,
+        })
     }
 
     /// Returns the string label used for database storage and display
@@ -57,7 +71,8 @@ impl ToduStatus {
     /// Converts a nu `Value` into a `ToduStatus` for comparison operations
     fn coerce(other: &Value) -> Option<Self> {
         match other {
-            Value::String { val, .. } => Some(Self::from_str(val)),
+            Value::String { val, .. } => Self::from_str(val),
+            Value::Int { val, .. } => Some(Self::from(*val as u8)),
             Value::Custom { val, .. } => val.as_any().downcast_ref::<ToduStatus>().cloned(),
             _ => None,
         }
@@ -71,7 +86,16 @@ impl CustomValue for ToduStatus {
     }
 
     fn to_base_value(&self, span: Span) -> Result<Value, ShellError> {
-        Ok(Value::string(self.label().to_string(), span))
+        let label = self.label();
+        let colored = match self {
+            Self::InProgress => Style::new().italic().paint(label),
+            Self::InReview => Color::LightMagenta.underline().paint(label),
+            Self::Pending => Style::new().paint(label),
+            Self::Paused => Style::new().dimmed().paint(label),
+            Self::Stopped => Style::new().dimmed().strikethrough().paint(label),
+            Self::Done => Color::LightGreen.strikethrough().paint(label),
+        };
+        Ok(Value::string(colored.to_string(), span))
     }
 
     fn clone_value(&self, span: Span) -> Value {
@@ -129,7 +153,7 @@ impl FromSql for ToduStatus {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         value
             .as_str()
-            .map(ToduStatus::from_str)
+            .map(|s| ToduStatus::from_str(s).unwrap_or(ToduStatus::Pending))
             .map_err(|e| FromSqlError::Other(Box::new(e)))
     }
 }
