@@ -9,14 +9,14 @@ use std::cmp::Ordering;
 /// Priority level of a todo
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ToduPriority {
-    /// High priority @!!!
-    High,
-    /// Medium priority @!!
-    Medium,
-    /// Low priority @!
-    Low,
     /// No priority
     Unset,
+    /// Low priority @!
+    Low,
+    /// Medium priority @!!
+    Medium,
+    /// High priority @!!!
+    High,
 }
 
 impl ToduPriority {

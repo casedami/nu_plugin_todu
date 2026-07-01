@@ -73,7 +73,11 @@ pub fn parse_inline(input: &str) -> Result<ParsedTodu, LabeledError> {
                 let bang_count = token.chars().take_while(|c| *c == '!').count();
                 if bang_count > 0 {
                     let n = bang_count.min(3);
-                    priority = Some(ToduPriority::from(n as u8));
+                    priority = Some(match n {
+                        1 => ToduPriority::Low,
+                        2 => ToduPriority::Medium,
+                        _ => ToduPriority::High,
+                    });
                     let rest = &token[bang_count..];
                     return if rest.is_empty() { None } else { Some(rest) };
                 }

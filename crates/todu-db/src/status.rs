@@ -9,18 +9,18 @@ use std::cmp::Ordering;
 /// Lifecycle state of a todo. Ordered so that active states sort before terminal ones
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ToduStatus {
-    /// Task has been started
-    InProgress,
-    /// Task has not been started yet
-    Pending,
-    /// Parent task with all children tasks marked as `Done`
-    InReview,
-    /// Task has been paused and is no longer in progress
-    Paused,
-    /// Task is no longer being pursued
-    Stopped,
     /// Task has been finished
     Done,
+    /// Task is no longer being pursued
+    Stopped,
+    /// Task has been paused and is no longer in progress
+    Paused,
+    /// Task has not been started yet
+    Pending,
+    /// Task has been started
+    InProgress,
+    /// Parent task with all children tasks marked as `Done`
+    InReview,
 }
 
 impl ToduStatus {
