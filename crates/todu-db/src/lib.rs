@@ -327,7 +327,7 @@ impl ToduLocalDatabase {
 
 /// Sorts a tree of todos by status, priority, then `ptid`, recursively
 fn sort_tree(tasks: &mut [ToduRow]) {
-    tasks.sort_by_key(|t| std::cmp::Reverse((t.status, t.priority, t.ptid)));
+    tasks.sort_by_key(|t| (std::cmp::Reverse(t.status), std::cmp::Reverse(t.priority), t.ptid));
     for task in tasks.iter_mut() {
         sort_tree(&mut task.subtasks);
     }

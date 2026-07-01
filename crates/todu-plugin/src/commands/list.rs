@@ -26,7 +26,7 @@ impl SimplePluginCommand for ToduList {
     }
 
     fn extra_description(&self) -> &str {
-        "Subcommands: add, start, done, stop, pause, reopen, due, desc, clear"
+        "Subcommands: add, get, start, done, stop, pause, reopen, due, desc, clear"
     }
 
     fn signature(&self) -> Signature {
