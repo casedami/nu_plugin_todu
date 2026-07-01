@@ -60,8 +60,8 @@ impl ToduRow {
     pub fn render(&self, span: Span, long: bool) -> Value {
         let mut rec = Record::new();
 
-        rec.push("title", render_title(&self.title, &self.status, span));
         rec.push("id", Value::int(self.ptid, span));
+        rec.push("title", render_title(&self.title, &self.status, span));
         rec.push("status", render_status(&self.status, span));
         rec.push("priority", render_priority(&self.priority, span));
         rec.push(
