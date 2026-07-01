@@ -112,6 +112,7 @@ impl Plugin for ToduPlugin {
     fn commands(&self) -> Vec<Box<dyn PluginCommand<Plugin = Self>>> {
         vec![
             Box::new(ToduList),
+            Box::new(ToduGet),
             Box::new(ToduAdd),
             Box::new(ToduDone),
             Box::new(ToduStart),

@@ -1,6 +1,7 @@
 mod add;
 mod clear;
 mod edit;
+mod get;
 mod list;
 mod rm;
 #[cfg(feature = "remote")]
@@ -12,6 +13,7 @@ mod status;
 pub use add::ToduAdd;
 pub use clear::ToduClear;
 pub use edit::{ToduDesc, ToduDue, ToduTag};
+pub use get::ToduGet;
 pub use list::ToduList;
 pub use rm::ToduRm;
 #[cfg(feature = "remote")]
