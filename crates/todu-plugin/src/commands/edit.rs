@@ -144,7 +144,7 @@ impl SimplePluginCommand for ToduDue {
         "todu due"
     }
     fn description(&self) -> &str {
-        "Set or clear the due date for a todo (pass \"\" to clear)"
+        "Set or clear the due date for a todo (pass \"none\" or \"\" to clear)"
     }
 
     fn signature(&self) -> Signature {
@@ -153,7 +153,7 @@ impl SimplePluginCommand for ToduDue {
             .required(
                 "date",
                 SyntaxShape::String,
-                "Due date (YYYY-MM-DD or SQLite date modifier)",
+                "Due date (YYYY-MM-DD, natural language, or \"none\"/\"\" to clear)",
             )
             .switch("global", "Use home directory as project", Some('g'))
             .input_output_type(Type::Nothing, Type::Nothing)
@@ -171,7 +171,7 @@ impl SimplePluginCommand for ToduDue {
         let date: String = call.req(1)?;
         plugin.with_project(engine, call, |db, proj| {
             assert_todo_exists(db, id, proj, call.positional[0].span())?;
-            let due = if date.is_empty() {
+            let due = if date.is_empty() || date.eq_ignore_ascii_case("none") {
                 None
             } else {
                 parse_due(&date)?

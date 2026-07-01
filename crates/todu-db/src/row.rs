@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone, Utc};
 use nu_ansi_term::{Color, Style};
 use nu_protocol::{Record, Span, Value};
 use rusqlite::{Result as SqlResult, Row};
@@ -59,22 +59,12 @@ impl ToduRow {
     /// description, source, and created date; `false` for the compact list view.
     pub fn render(&self, span: Span, long: bool) -> Value {
         let mut rec = Record::new();
-
-        rec.push("index", Value::int(self.ptid, span));
-        rec.push("title", Value::string(self.title.clone(), span));
-        rec.push("status", render_status(&self.status, span));
-        rec.push("priority", render_priority(&self.priority, span));
-        rec.push(
-            "desc",
-            if self.desc.is_empty() {
-                render_empty(span)
-            } else if long {
-                Value::string(self.desc.clone(), span)
-            } else {
-                render_truncated(span)
-            },
-        );
-        rec.push("due", render_due(&self.due, span));
+        rec.push("id", Value::int(self.ptid, span));
+        rec.push("title", render_title(&self.title, &self.status, span));
+        rec.push("status", Value::custom(Box::new(self.status), span));
+        rec.push("priority", Value::custom(Box::new(self.priority), span));
+        rec.push("desc", render_desc(&self.desc, long, span));
+        rec.push("due", render_due(self.due, &self.status, span));
         rec.push("subtasks", self.render_subtasks(span, long));
         rec.push(
             "tag",
@@ -119,48 +109,51 @@ fn render_truncated(span: Span) -> Value {
     Value::string(Style::new().dimmed().paint(TRUNCATED).to_string(), span)
 }
 
-fn render_due(date: &Option<NaiveDate>, span: Span) -> Value {
-    match date {
-        None => render_empty(span),
-        Some(date) if is_overdue(*date) => Value::string(
-            Color::LightRed
-                .underline()
-                .paint(date.format("%Y-%m-%d").to_string())
-                .to_string(),
-            span,
-        ),
-        Some(date) => Local
-            .from_local_datetime(&date.and_hms_opt(0, 0, 0).unwrap())
-            .single()
-            .map(|dt| Value::date(dt.fixed_offset(), span))
-            .unwrap_or_else(|| Value::string(date.format("%Y-%m-%d").to_string(), span)),
+fn render_title(title: &str, status: &ToduStatus, span: Span) -> Value {
+    let style = if !status.is_active() {
+        Style::new().dimmed().strikethrough()
+    } else if *status == ToduStatus::Paused {
+        Style::new().dimmed()
+    } else {
+        Style::new()
+    };
+    Value::string(style.paint(title).to_string(), span)
+}
+
+fn render_desc(desc: &String, long: bool, span: Span) -> Value {
+    if desc.is_empty() {
+        render_empty(span)
+    } else if long {
+        Value::string(Style::new().paint(desc).to_string(), span)
+    } else {
+        render_truncated(span)
     }
 }
 
-fn is_overdue(date: NaiveDate) -> bool {
-    date < Local::now().date_naive()
+fn render_due(date: Option<NaiveDate>, status: &ToduStatus, span: Span) -> Value {
+    let Some(d) = date.and_then(|d| {
+        Local
+            .from_local_datetime(&d.and_hms_opt(0, 0, 0).unwrap())
+            .single()
+            .map(|dt| dt.fixed_offset())
+    }) else {
+        return render_empty(span);
+    };
+
+    if is_overdue(d) && status.is_active() {
+        Value::string(
+            Color::LightRed
+                .bold()
+                .underline()
+                .paint(d.date_naive().to_string())
+                .to_string(),
+            span,
+        )
+    } else {
+        Value::date(d, span)
+    }
 }
 
-fn render_priority(priority: &ToduPriority, span: Span) -> Value {
-    let label = priority.label();
-    let colored = match priority {
-        ToduPriority::High => Color::LightRed.bold().paint(label),
-        ToduPriority::Medium => Color::LightYellow.paint(label),
-        ToduPriority::Low => Style::new().paint(label),
-        ToduPriority::Unset => Style::new().dimmed().paint(label),
-    };
-    Value::string(colored.to_string(), span)
-}
-
-fn render_status(status: &ToduStatus, span: Span) -> Value {
-    let label = status.label();
-    let colored = match status {
-        ToduStatus::InProgress => Style::new().italic().paint(label),
-        ToduStatus::InReview => Color::LightMagenta.underline().paint(label),
-        ToduStatus::Pending => Style::new().paint(label),
-        ToduStatus::Paused => Style::new().dimmed().paint(label),
-        ToduStatus::Stopped => Style::new().dimmed().strikethrough().paint(label),
-        ToduStatus::Done => Color::LightGreen.strikethrough().paint(label),
-    };
-    Value::string(colored.to_string(), span)
+fn is_overdue(date: DateTime<FixedOffset>) -> bool {
+    date < Local::now().fixed_offset()
 }

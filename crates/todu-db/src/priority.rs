@@ -1,3 +1,4 @@
+use nu_ansi_term::{Color, Style};
 use nu_protocol::{ast::Operator, CustomValue, ShellError, Span, Value};
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 
@@ -6,28 +7,16 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
 /// Priority level of a todo
-#[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ToduPriority {
-    /// High priority @!!!
-    High,
-    /// Medium priority @!!
-    Medium,
-    /// Low priority @!
-    Low,
     /// No priority
     Unset,
-}
-
-impl From<u8> for ToduPriority {
-    fn from(n: u8) -> Self {
-        match n {
-            3 => Self::High,
-            2 => Self::Medium,
-            1 => Self::Low,
-            _ => Self::Unset,
-        }
-    }
+    /// Low priority @!
+    Low,
+    /// Medium priority @!!
+    Medium,
+    /// High priority @!!!
+    High,
 }
 
 impl ToduPriority {
@@ -52,14 +41,21 @@ impl ToduPriority {
         }
     }
 
+    fn styled(&self) -> Style {
+        match self {
+            Self::High => Color::LightRed.bold(),
+            Self::Medium => Color::LightYellow.normal(),
+            Self::Low => Color::LightBlue.normal(),
+            Self::Unset => Color::LightGray.dimmed(),
+        }
+    }
+
     /// Converts a nu `Value` into a `ToduPriority` for comparison operations.
     ///
     /// This allows things like `todo | where priority > low`.
     fn coerce(other: &Value) -> Option<Self> {
         match other {
             Value::String { val, .. } => Self::from_str(val),
-            Value::Int { val, .. } => Some(Self::from(*val as u8)),
-            Value::Custom { val, .. } => val.as_any().downcast_ref::<ToduPriority>().cloned(),
             _ => None,
         }
     }
@@ -72,7 +68,10 @@ impl CustomValue for ToduPriority {
     }
 
     fn to_base_value(&self, span: Span) -> Result<Value, ShellError> {
-        Ok(Value::string(self.label().to_string(), span))
+        Ok(Value::string(
+            self.styled().paint(self.label()).to_string(),
+            span,
+        ))
     }
 
     fn clone_value(&self, span: Span) -> Value {

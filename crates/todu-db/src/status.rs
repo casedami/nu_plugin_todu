@@ -7,42 +7,28 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
 /// Lifecycle state of a todo. Ordered so that active states sort before terminal ones
-#[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ToduStatus {
-    /// Task has been started
-    InProgress,
-    /// Task has not been started yet
-    Pending,
-    /// Parent task with all children tasks marked as `Done`
-    InReview,
-    /// Task has been paused and is no longer in progress
-    Paused,
-    /// Task is no longer being pursued
-    Stopped,
     /// Task has been finished
     Done,
-}
-
-impl From<u8> for ToduStatus {
-    fn from(n: u8) -> Self {
-        match n {
-            5 => Self::InProgress,
-            4 => Self::Pending,
-            3 => Self::InReview,
-            2 => Self::Paused,
-            1 => Self::Stopped,
-            _ => Self::Done,
-        }
-    }
+    /// Task is no longer being pursued
+    Stopped,
+    /// Task has been paused and is no longer in progress
+    Paused,
+    /// Task has not been started yet
+    Pending,
+    /// Task has been started
+    InProgress,
+    /// Parent task with all children tasks marked as `Done`
+    InReview,
 }
 
 impl ToduStatus {
-    /// Parses a status string (accepts both hyphenated and underscore forms). Returns `None` for unrecognised values.
+    /// Parses a status string. Returns `None` for unrecognised values.
     pub(crate) fn from_str(s: &str) -> Option<Self> {
         Some(match s {
-            "in_progress" | "in-progress" => Self::InProgress,
-            "in_review" | "in-review" => Self::InReview,
+            "in-progress" => Self::InProgress,
+            "in-review" => Self::InReview,
             "pending" => Self::Pending,
             "paused" => Self::Paused,
             "stopped" => Self::Stopped,
@@ -63,7 +49,18 @@ impl ToduStatus {
         }
     }
 
-    /// Returns `true` for statuses that are not terminal (`Done` or `Stopped`)
+    fn styled(&self) -> Style {
+        match self {
+            Self::InProgress => Color::LightBlue.italic(),
+            Self::InReview => Color::Green.underline(),
+            Self::Pending => Color::LightBlue.normal(),
+            Self::Paused => Color::DarkGray.italic(),
+            Self::Stopped => Color::DarkGray.dimmed(),
+            Self::Done => Color::Green.normal(),
+        }
+    }
+
+    /// Returns `true` for statuses that are not terminal
     pub fn is_active(&self) -> bool {
         !matches!(self, Self::Done | Self::Stopped)
     }
@@ -72,8 +69,6 @@ impl ToduStatus {
     fn coerce(other: &Value) -> Option<Self> {
         match other {
             Value::String { val, .. } => Self::from_str(val),
-            Value::Int { val, .. } => Some(Self::from(*val as u8)),
-            Value::Custom { val, .. } => val.as_any().downcast_ref::<ToduStatus>().cloned(),
             _ => None,
         }
     }
@@ -86,16 +81,10 @@ impl CustomValue for ToduStatus {
     }
 
     fn to_base_value(&self, span: Span) -> Result<Value, ShellError> {
-        let label = self.label();
-        let colored = match self {
-            Self::InProgress => Style::new().italic().paint(label),
-            Self::InReview => Color::LightMagenta.underline().paint(label),
-            Self::Pending => Style::new().paint(label),
-            Self::Paused => Style::new().dimmed().paint(label),
-            Self::Stopped => Style::new().dimmed().strikethrough().paint(label),
-            Self::Done => Color::LightGreen.strikethrough().paint(label),
-        };
-        Ok(Value::string(colored.to_string(), span))
+        Ok(Value::string(
+            self.styled().paint(self.label()).to_string(),
+            span,
+        ))
     }
 
     fn clone_value(&self, span: Span) -> Value {
