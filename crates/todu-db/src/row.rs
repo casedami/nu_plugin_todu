@@ -61,7 +61,7 @@ impl ToduRow {
         let mut rec = Record::new();
 
         rec.push("index", Value::int(self.ptid, span));
-        rec.push("title", Value::string(self.title.clone(), span));
+        rec.push("title", render_title(&self.title, &self.status, span));
         rec.push("status", render_status(&self.status, span));
         rec.push("priority", render_priority(&self.priority, span));
         rec.push(
@@ -119,6 +119,16 @@ fn render_truncated(span: Span) -> Value {
     Value::string(Style::new().dimmed().paint(TRUNCATED).to_string(), span)
 }
 
+fn render_title(title: &str, status: &ToduStatus, span: Span) -> Value {
+    let styled = match status {
+        ToduStatus::Done | ToduStatus::Paused | ToduStatus::Stopped => {
+            Style::new().dimmed().paint(title).to_string()
+        }
+        _ => title.to_string(),
+    };
+    Value::string(styled, span)
+}
+
 fn render_due(date: &Option<NaiveDate>, span: Span) -> Value {
     match date {
         None => render_empty(span),
@@ -142,25 +152,9 @@ fn is_overdue(date: NaiveDate) -> bool {
 }
 
 fn render_priority(priority: &ToduPriority, span: Span) -> Value {
-    let label = priority.label();
-    let colored = match priority {
-        ToduPriority::High => Color::LightRed.bold().paint(label),
-        ToduPriority::Medium => Color::LightYellow.paint(label),
-        ToduPriority::Low => Style::new().paint(label),
-        ToduPriority::Unset => Style::new().dimmed().paint(label),
-    };
-    Value::string(colored.to_string(), span)
+    Value::custom(Box::new(*priority), span)
 }
 
 fn render_status(status: &ToduStatus, span: Span) -> Value {
-    let label = status.label();
-    let colored = match status {
-        ToduStatus::InProgress => Style::new().italic().paint(label),
-        ToduStatus::InReview => Color::LightMagenta.underline().paint(label),
-        ToduStatus::Pending => Style::new().paint(label),
-        ToduStatus::Paused => Style::new().dimmed().paint(label),
-        ToduStatus::Stopped => Style::new().dimmed().strikethrough().paint(label),
-        ToduStatus::Done => Color::LightGreen.strikethrough().paint(label),
-    };
-    Value::string(colored.to_string(), span)
+    Value::custom(Box::new(*status), span)
 }
