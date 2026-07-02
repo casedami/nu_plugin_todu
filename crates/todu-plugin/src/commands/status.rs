@@ -23,7 +23,7 @@ fn apply_status(
             #[cfg(feature = "remote")]
             crate::remote::push_status(engine, row.source, row.tag.as_deref(), status)?;
             let updated = db.get_todo_tree(*id, proj).map_err(db_err)?;
-            rendered.push(updated.render(head, true));
+            rendered.push(updated.render_long(head));
         }
         let value = if rendered.len() == 1 {
             rendered.remove(0)

@@ -129,7 +129,7 @@ impl SimplePluginCommand for ToduPullGitHub {
                             },
                         )
                         .map_err(db_err)?;
-                    imported.push(row.render(span, false));
+                    imported.push(row.render_short(span));
                 }
             }
 
@@ -291,7 +291,7 @@ impl SimplePluginCommand for ToduPullJira {
                             },
                         )
                         .map_err(db_err)?;
-                    imported.push(row.render(span, false));
+                    imported.push(row.render_short(span));
                 }
             }
 

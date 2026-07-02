@@ -35,7 +35,7 @@ impl SimplePluginCommand for ToduGet {
         plugin.with_project(engine, call, |db, proj| {
             assert_todo_exists(db, id, proj, call.positional[0].span())?;
             let row = db.get_todo_tree(id, proj).map_err(db_err)?;
-            Ok(row.render(call.head, true))
+            Ok(row.render_long(call.head))
         })
     }
 }

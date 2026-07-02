@@ -54,7 +54,7 @@ impl SimplePluginCommand for ToduPriorityCmd {
             };
             db.update_priority(id, proj, priority).map_err(db_err)?;
             let row = db.get_todo_tree(id, proj).map_err(db_err)?;
-            Ok(row.render(call.head, true))
+            Ok(row.render_long(call.head))
         })
     }
 }

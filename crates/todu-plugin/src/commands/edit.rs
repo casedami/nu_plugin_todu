@@ -55,7 +55,7 @@ impl SimplePluginCommand for ToduDesc {
             };
             db.update_desc(id, proj, desc.as_deref()).map_err(db_err)?;
             let row = db.get_todo_tree(id, proj).map_err(db_err)?;
-            Ok(row.render(call.head, true))
+            Ok(row.render_long(call.head))
         })
     }
 }
@@ -111,7 +111,7 @@ impl SimplePluginCommand for ToduTag {
             let tag_val = if tag.is_empty() || tag.eq_ignore_ascii_case("none") { None } else { Some(tag.as_str()) };
             db.update_tag(id, proj, tag_val).map_err(db_err)?;
             let row = db.get_todo_tree(id, proj).map_err(db_err)?;
-            Ok(row.render(call.head, true))
+            Ok(row.render_long(call.head))
         })
     }
 }
@@ -160,7 +160,7 @@ impl SimplePluginCommand for ToduDue {
             };
             db.update_due(id, proj, due).map_err(db_err)?;
             let row = db.get_todo_tree(id, proj).map_err(db_err)?;
-            Ok(row.render(call.head, true))
+            Ok(row.render_long(call.head))
         })
     }
 }

@@ -59,7 +59,7 @@ impl SimplePluginCommand for ToduList {
                 if flat.is_empty() {
                     Value::string("No overdue todos", span)
                 } else {
-                    Value::list(flat.iter().map(|r| r.render(span, false)).collect(), span)
+                    Value::list(flat.iter().map(|r| r.render_short(span)).collect(), span)
                 }
             } else if rows.is_empty() {
                 let idx = std::time::SystemTime::now()
@@ -69,7 +69,7 @@ impl SimplePluginCommand for ToduList {
                     % EMPTY_MSGS.len();
                 Value::string(EMPTY_MSGS[idx], span)
             } else {
-                Value::list(rows.iter().map(|r| r.render(span, false)).collect(), span)
+                Value::list(rows.iter().map(|r| r.render_short(span)).collect(), span)
             };
             Ok(result)
         })

@@ -68,97 +68,109 @@ impl ToduRow {
             })
     }
 
-    /// Constructs a todu row for output
-    pub fn render(&self, span: Span, long: bool) -> Value {
-        let mut rec = Record::new();
-        rec.push("id", Value::int(self.ptid, span));
-
-        let due = self.due.and_then(|d| {
+    fn due_date(&self) -> Option<DateTime<FixedOffset>> {
+        self.due.and_then(|d| {
             Local
                 .from_local_datetime(&d.and_hms_opt(23, 59, 59).unwrap())
                 .single()
                 .map(|dt| dt.fixed_offset())
-        });
+        })
+    }
 
-        let title = {
-            let style = if !self.status.is_active() {
-                Style::new().dimmed().strikethrough()
-            } else if self.status == ToduStatus::Paused {
-                Style::new().dimmed()
-            } else if due.is_some_and(is_overdue) {
-                Color::LightRed.bold().italic()
-            } else {
-                Style::new()
-            };
+    fn title_style(&self, due: Option<DateTime<FixedOffset>>) -> Style {
+        if !self.status.is_active() {
+            Style::new().dimmed().strikethrough()
+        } else if self.status == ToduStatus::Paused {
+            Style::new().dimmed()
+        } else if due.is_some_and(is_overdue) {
+            Color::LightRed.bold().italic()
+        } else {
+            Style::new()
+        }
+    }
 
-            if long {
-                Value::string(style.paint(&self.title).to_string(), span)
-            } else {
-                let subtask_ratio = if !self.subtasks.is_empty() {
-                    let total = self
-                        .subtasks
-                        .iter()
-                        .filter(|s| s.status != ToduStatus::Stopped)
-                        .count();
-                    let done = self
-                        .subtasks
-                        .iter()
-                        .filter(|s| s.status == ToduStatus::Done)
-                        .count();
-                    style.dimmed().paint(format!(" {done}/{total}")).to_string()
-                } else {
-                    String::new()
-                };
-                let desc_suffix = if self.desc.is_some() {
-                    TRUNCATED.to_string()
-                } else {
-                    String::new()
-                };
-                let title_desc = style
-                    .paint(format!("{}{desc_suffix}", &self.title))
-                    .to_string();
-                Value::string(format!("{title_desc}{subtask_ratio}"), span)
-            }
+    fn render_title_short(&self, style: Style, span: Span) -> Value {
+        let subtask_ratio = if self.subtasks.is_empty() {
+            String::new()
+        } else {
+            let total = self
+                .subtasks
+                .iter()
+                .filter(|s| s.status != ToduStatus::Stopped)
+                .count();
+            let done = self
+                .subtasks
+                .iter()
+                .filter(|s| s.status == ToduStatus::Done)
+                .count();
+            style.dimmed().paint(format!(" {done}/{total}")).to_string()
         };
-        rec.push("title", title);
+        let desc_suffix = if self.desc.is_some() { TRUNCATED } else { "" };
+        let title = style.paint(format!("{}{desc_suffix}", &self.title));
+        Value::string(format!("{title}{subtask_ratio}"), span)
+    }
+
+    fn render_title_long(&self, style: Style, span: Span) -> Value {
+        Value::string(style.paint(&self.title).to_string(), span)
+    }
+
+    fn render_subtasks(&self, span: Span) -> Option<Value> {
+        (!self.subtasks.is_empty()).then(|| {
+            Value::list(
+                self.subtasks.iter().map(|s| s.render_short(span)).collect(),
+                span,
+            )
+        })
+    }
+
+    /// Constructs a compact todu row for list output
+    pub fn render_short(&self, span: Span) -> Value {
+        let due = self.due_date();
+        let style = self.title_style(due);
+        let mut rec = Record::new();
+        rec.push("id", Value::int(self.ptid, span));
+        rec.push("title", self.render_title_short(style, span));
         rec.push("status", Value::custom(Box::new(self.status), span));
         if let Some(priority) = self.priority {
             rec.push("priority", Value::custom(Box::new(priority), span));
         }
-
         if let Some(d) = due {
             rec.push("due", Value::date(d, span));
         }
-
         if let Some(ref t) = self.tag {
             rec.push("tag", Value::string(t.clone(), span));
         }
+        Value::record(rec, span)
+    }
 
-        if long {
-            if !self.subtasks.is_empty() {
-                rec.push(
-                    "subtasks",
-                    Value::list(
-                        self.subtasks
-                            .iter()
-                            .map(|s| s.render(span, false))
-                            .collect(),
-                        span,
-                    ),
-                );
-            }
-
-            if let Some(ref desc) = self.desc {
-                rec.push("desc", Value::string(desc.clone(), span));
-            }
-
-            rec.push("source", Value::string(self.source.label(), span));
-            if let Some(parent) = self.pptid {
-                rec.push("parent", Value::int(parent, span));
-            }
-            rec.push("created", Value::date(self.created.fixed_offset(), span));
+    /// Constructs a detailed todu row with all fields
+    pub fn render_long(&self, span: Span) -> Value {
+        let due = self.due_date();
+        let style = self.title_style(due);
+        let mut rec = Record::new();
+        rec.push("id", Value::int(self.ptid, span));
+        rec.push("title", self.render_title_long(style, span));
+        rec.push("status", Value::custom(Box::new(self.status), span));
+        if let Some(priority) = self.priority {
+            rec.push("priority", Value::custom(Box::new(priority), span));
         }
-
+        if let Some(d) = due {
+            rec.push("due", Value::date(d, span));
+        }
+        if let Some(ref t) = self.tag {
+            rec.push("tag", Value::string(t.clone(), span));
+        }
+        if let Some(subtasks) = self.render_subtasks(span) {
+            rec.push("subtasks", subtasks);
+        }
+        if let Some(ref desc) = self.desc {
+            rec.push("desc", Value::string(desc.clone(), span));
+        }
+        rec.push("source", Value::string(self.source.label(), span));
+        if let Some(parent) = self.pptid {
+            rec.push("parent", Value::int(parent, span));
+        }
+        rec.push("created", Value::date(self.created.fixed_offset(), span));
         Value::record(rec, span)
     }
 }
