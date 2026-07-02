@@ -5,8 +5,6 @@ use nu_protocol::{Category, LabeledError, Signature, Type, Value};
 use serde::Deserialize;
 use todu_db::{ParsedTodu, ToduSource};
 
-// ── GitHub ────────────────────────────────────────────────────────────────────
-
 #[derive(Deserialize)]
 struct GitHubIssue {
     number: u64,
@@ -63,8 +61,7 @@ impl SimplePluginCommand for ToduPullGitHub {
          Tokens are resolved per remote via token_file or the OS keychain\n\
          (service = \"todu-github\", account = \"{owner}/{repo}\").\n\n\
          The issue number is stored in the tag column (e.g. \"#42\").\n\
-         Re-running is idempotent — already-present issues are skipped.\n\
-         Status changes (todu done, todu start, etc.) are pushed back to GitHub."
+         Status changes (todu done, todu start, etc.) are automatically pushed back to GitHub."
     }
 
     fn signature(&self) -> Signature {
@@ -149,8 +146,6 @@ impl SimplePluginCommand for ToduPullGitHub {
     }
 }
 
-// ── Jira ─────────────────────────────────────────────────────────────────────
-
 #[derive(Deserialize)]
 struct JiraSearchResult {
     issues: Vec<JiraIssue>,
@@ -225,8 +220,7 @@ impl SimplePluginCommand for ToduPullJira {
          \x20   }\n\
          }\n\n\
          The Jira issue key is stored in the tag column (e.g. \"PROJ-123\").\n\
-         Re-running is idempotent — already-present issues are skipped.\n\
-         Status changes (todu done, todu start, etc.) are pushed back via Jira transitions."
+         Status changes (todu done, todu start, etc.) are automatically pushed back via Jira transitions."
     }
 
     fn signature(&self) -> Signature {
