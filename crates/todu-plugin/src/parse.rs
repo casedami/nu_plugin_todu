@@ -1,23 +1,20 @@
 use chrono::{Local, NaiveDate};
+use human_date_parser::{ParseResult, from_human_time};
 use nu_protocol::LabeledError;
 use todu_db::{ParsedTodu, ToduPriority, ToduSource};
 
-/// Parses a date string in `YYYY-MM-DD` or natural-language form (e.g. `"friday"`, `"next week"`)
+/// Parses a date string in `YYYY-MM-DD` or natural-language form (e.g. `"friday"`, `"in 3 days"`)
 pub fn parse_due(raw: &str) -> Result<Option<NaiveDate>, LabeledError> {
     let now = Local::now();
     NaiveDate::parse_from_str(raw, "%Y-%m-%d")
         .or_else(|_| {
-            chrono_english::parse_date_string(raw, now, chrono_english::Dialect::Us)
-                .map(|dt| dt.date_naive())
-                .map_err(|_| ())
-        })
-        .or_else(|_| {
-            if raw.contains(|c: char| c.is_ascii_digit()) {
-                return Err(());
-            }
             let spaced = raw.replace('-', " ");
-            chrono_english::parse_date_string(&spaced, now, chrono_english::Dialect::Us)
-                .map(|dt| dt.date_naive())
+            from_human_time(&spaced, now.naive_local())
+                .map(|r| match r {
+                    ParseResult::Date(d) => d,
+                    ParseResult::DateTime(dt) => dt.date(),
+                    ParseResult::Time(_) => now.date_naive(),
+                })
                 .map_err(|_| ())
         })
         .map(Some)

@@ -41,7 +41,10 @@ impl ToduRow {
     pub(super) fn from_sql(row: &Row) -> SqlResult<Self> {
         Ok(Self {
             ptid: row.get(0)?,
-            priority: row.get::<_, Option<String>>(1)?.as_deref().and_then(ToduPriority::from_str),
+            priority: row
+                .get::<_, Option<String>>(1)?
+                .as_deref()
+                .and_then(ToduPriority::from_str),
             status: row.get(2)?,
             title: row.get(3)?,
             due: row.get(4)?,
@@ -59,11 +62,20 @@ impl ToduRow {
         let mut rec = Record::new();
         rec.push("id", Value::int(self.ptid, span));
 
+        let due = self.due.and_then(|d| {
+            Local
+                .from_local_datetime(&d.and_hms_opt(23, 59, 59).unwrap())
+                .single()
+                .map(|dt| dt.fixed_offset())
+        });
+
         let title = {
             let style = if !self.status.is_active() {
                 Style::new().dimmed().strikethrough()
             } else if self.status == ToduStatus::Paused {
                 Style::new().dimmed()
+            } else if due.is_some_and(is_overdue) {
+                Color::LightRed.bold().italic()
             } else {
                 Style::new()
             };
@@ -75,28 +87,8 @@ impl ToduRow {
             rec.push("priority", Value::custom(Box::new(priority), span));
         }
 
-        if let Some(due) = self.due {
-            let Some(d) = Local
-                .from_local_datetime(&due.and_hms_opt(0, 0, 0).unwrap())
-                .single()
-                .map(|dt| dt.fixed_offset())
-            else {
-                return Value::nothing(span);
-            };
-
-            let dt = if is_overdue(d) && self.status.is_active() {
-                Value::string(
-                    Color::LightRed
-                        .bold()
-                        .underline()
-                        .paint(d.date_naive().to_string())
-                        .to_string(),
-                    span,
-                )
-            } else {
-                Value::date(d, span)
-            };
-            rec.push("due", dt);
+        if let Some(d) = due {
+            rec.push("due", Value::date(d, span));
         }
 
         if let Some(ref t) = self.tag {
@@ -105,7 +97,13 @@ impl ToduRow {
 
         if !self.subtasks.is_empty() {
             let subtasks_val = if long {
-                Value::list(self.subtasks.iter().map(|s| s.render(span, false)).collect(), span)
+                Value::list(
+                    self.subtasks
+                        .iter()
+                        .map(|s| s.render(span, false))
+                        .collect(),
+                    span,
+                )
             } else {
                 let total = self
                     .subtasks

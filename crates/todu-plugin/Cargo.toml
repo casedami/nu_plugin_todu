@@ -9,7 +9,7 @@ remote = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:keyring", "todu-db/
 [dependencies]
 todu-db = { path = "../todu-db" }
 chrono = "0.4"
-chrono-english = "0.1.8"
+human-date-parser = "0.3.1"
 nu-ansi-term = "0.50"
 nu-plugin = "0.113.0"
 nu-protocol = { version = "0.113.0", features = ["plugin"] }
