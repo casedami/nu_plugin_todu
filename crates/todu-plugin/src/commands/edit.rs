@@ -37,7 +37,7 @@ impl SimplePluginCommand for ToduDesc {
         let text: String = call.req(1)?;
         plugin.with_project(engine, call, |db, proj| {
             assert_todo_exists(db, id, proj, call.positional[0].span())?;
-            db.update_desc(id, proj, &text).map_err(db_err)?;
+            db.update_desc(id, proj, if text.is_empty() { None } else { Some(text.as_str()) }).map_err(db_err)?;
             Ok(Value::nothing(call.head))
         })
     }

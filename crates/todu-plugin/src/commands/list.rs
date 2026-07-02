@@ -32,11 +32,6 @@ impl SimplePluginCommand for ToduList {
     fn signature(&self) -> Signature {
         Signature::build("todu")
             .switch(
-                "long",
-                "Show full view including created date and full desc",
-                Some('l'),
-            )
-            .switch(
                 "global",
                 "Use home directory as project instead of git root",
                 Some('g'),
@@ -52,7 +47,6 @@ impl SimplePluginCommand for ToduList {
         call: &EvaluatedCall,
         _input: &Value,
     ) -> Result<Value, LabeledError> {
-        let long: bool = call.has_flag("long")?;
         plugin.with_project(engine, call, |db, proj| {
             let rows = db.get_live_todos(proj).map_err(db_err)?;
             let span = call.head;
@@ -64,7 +58,7 @@ impl SimplePluginCommand for ToduList {
                     % EMPTY_MSGS.len();
                 Value::string(EMPTY_MSGS[idx], span)
             } else {
-                Value::list(rows.iter().map(|r| r.render(span, long)).collect(), span)
+                Value::list(rows.iter().map(|r| r.render(span, false)).collect(), span)
             };
             Ok(result)
         })

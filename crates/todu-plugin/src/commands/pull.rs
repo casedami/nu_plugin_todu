@@ -3,7 +3,7 @@ use crate::{db_err, ToduPlugin};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{Category, LabeledError, Signature, Type, Value};
 use serde::Deserialize;
-use todu_db::{ParsedTodu, ToduPriority, ToduSource};
+use todu_db::{ParsedTodu, ToduSource};
 
 // ── GitHub ────────────────────────────────────────────────────────────────────
 
@@ -120,9 +120,9 @@ impl SimplePluginCommand for ToduPullGitHub {
                             proj,
                             &ParsedTodu {
                                 title: issue.title,
-                                priority: ToduPriority::Unset,
+                                priority: None,
                                 due: None,
-                                desc: issue.body.unwrap_or_default(),
+                                desc: issue.body.filter(|b| !b.is_empty()),
                                 pptid: None,
                                 tag: Some(tag),
                                 source,
@@ -283,9 +283,9 @@ impl SimplePluginCommand for ToduPullJira {
                             proj,
                             &ParsedTodu {
                                 title: issue.fields.summary,
-                                priority: ToduPriority::Unset,
+                                priority: None,
                                 due: None,
-                                desc: String::new(),
+                                desc: None,
                                 pptid: None,
                                 tag: Some(tag),
                                 source,

@@ -1,6 +1,8 @@
 use crate::{assert_todo_exists, db_err, parse_inline, ToduPlugin};
 use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nu_protocol::{Category, LabeledError, PipelineData, Signature, Span, SyntaxShape, Type, Value};
+use nu_protocol::{
+    Category, LabeledError, PipelineData, Signature, Span, SyntaxShape, Type, Value,
+};
 
 /// Struct for the `todu add` command
 pub struct ToduAdd;

@@ -5,7 +5,6 @@ use rusqlite::{Result as SqlResult, Row};
 
 use super::{ToduPriority, ToduSource, ToduStatus};
 
-const EMPTY: &str = "---";
 const TRUNCATED: &str = "...";
 
 /// A single todo row as returned by the database
@@ -17,11 +16,11 @@ pub struct ToduRow {
     /// Task status
     pub status: ToduStatus,
     /// Task priority level
-    pub priority: ToduPriority,
+    pub priority: Option<ToduPriority>,
     /// Task due date
     pub due: Option<NaiveDate>,
     /// Additional task description
-    pub desc: String,
+    pub desc: Option<String>,
     /// Task creation date
     pub created: DateTime<Utc>,
     /// `ptid` of the parent task, or `None` for root-level todos.
@@ -42,7 +41,7 @@ impl ToduRow {
     pub(super) fn from_sql(row: &Row) -> SqlResult<Self> {
         Ok(Self {
             ptid: row.get(0)?,
-            priority: row.get(1)?,
+            priority: row.get::<_, Option<String>>(1)?.as_deref().and_then(ToduPriority::from_str),
             status: row.get(2)?,
             title: row.get(3)?,
             due: row.get(4)?,
@@ -55,102 +54,92 @@ impl ToduRow {
         })
     }
 
-    /// Renders the row as a nu `Value::record`. Pass `long = true` for the full view including
-    /// description, source, and created date; `false` for the compact list view.
+    /// Constructs a todu row for output
     pub fn render(&self, span: Span, long: bool) -> Value {
         let mut rec = Record::new();
         rec.push("id", Value::int(self.ptid, span));
-        rec.push("title", render_title(&self.title, &self.status, span));
+
+        let title = {
+            let style = if !self.status.is_active() {
+                Style::new().dimmed().strikethrough()
+            } else if self.status == ToduStatus::Paused {
+                Style::new().dimmed()
+            } else {
+                Style::new()
+            };
+            Value::string(style.paint(&self.title).to_string(), span)
+        };
+        rec.push("title", title);
         rec.push("status", Value::custom(Box::new(self.status), span));
-        rec.push("priority", Value::custom(Box::new(self.priority), span));
-        rec.push("desc", render_desc(&self.desc, long, span));
-        rec.push("due", render_due(self.due, &self.status, span));
-        rec.push("subtasks", self.render_subtasks(span, long));
-        rec.push(
-            "tag",
-            match &self.tag {
-                Some(t) => Value::string(t.clone(), span),
-                None => render_empty(span),
-            },
-        );
-        rec.push("source", Value::string(self.source.short_label(), span));
+        if let Some(priority) = self.priority {
+            rec.push("priority", Value::custom(Box::new(priority), span));
+        }
+
+        if let Some(due) = self.due {
+            let Some(d) = Local
+                .from_local_datetime(&due.and_hms_opt(0, 0, 0).unwrap())
+                .single()
+                .map(|dt| dt.fixed_offset())
+            else {
+                return Value::nothing(span);
+            };
+
+            let dt = if is_overdue(d) && self.status.is_active() {
+                Value::string(
+                    Color::LightRed
+                        .bold()
+                        .underline()
+                        .paint(d.date_naive().to_string())
+                        .to_string(),
+                    span,
+                )
+            } else {
+                Value::date(d, span)
+            };
+            rec.push("due", dt);
+        }
+
+        if let Some(ref t) = self.tag {
+            rec.push("tag", Value::string(t.clone(), span));
+        }
+
+        if !self.subtasks.is_empty() {
+            let subtasks_val = if long {
+                Value::list(self.subtasks.iter().map(|s| s.render(span, false)).collect(), span)
+            } else {
+                let total = self
+                    .subtasks
+                    .iter()
+                    .filter(|s| s.status != ToduStatus::Stopped)
+                    .count();
+                let done = self
+                    .subtasks
+                    .iter()
+                    .filter(|s| s.status == ToduStatus::Done)
+                    .count();
+                Value::string(format!("{done}/{total}"), span)
+            };
+            rec.push("subtasks", subtasks_val);
+        }
+
+        if let Some(ref desc) = self.desc {
+            let desc_val = if long {
+                Value::string(desc.clone(), span)
+            } else {
+                Value::string(Style::new().dimmed().paint(TRUNCATED).to_string(), span)
+            };
+            rec.push("desc", desc_val);
+        }
 
         if long {
+            rec.push("source", Value::string(self.source.label(), span));
+            if let Some(parent) = self.pptid {
+                rec.push("parent", Value::int(parent, span));
+            }
             rec.push("created", Value::date(self.created.fixed_offset(), span));
         }
 
         Value::record(rec, span)
-    }
-
-    fn render_subtasks(&self, span: Span, long: bool) -> Value {
-        if self.subtasks.is_empty() {
-            render_empty(span)
-        } else if long {
-            Value::list(
-                self.subtasks.iter().map(|s| s.render(span, long)).collect(),
-                span,
-            )
-        } else {
-            let active = self
-                .subtasks
-                .iter()
-                .filter(|s| s.status.is_active())
-                .count();
-            Value::int(active as i64, span)
-        }
-    }
-}
-
-fn render_empty(span: Span) -> Value {
-    Value::string(Style::new().dimmed().paint(EMPTY).to_string(), span)
-}
-
-fn render_truncated(span: Span) -> Value {
-    Value::string(Style::new().dimmed().paint(TRUNCATED).to_string(), span)
-}
-
-fn render_title(title: &str, status: &ToduStatus, span: Span) -> Value {
-    let style = if !status.is_active() {
-        Style::new().dimmed().strikethrough()
-    } else if *status == ToduStatus::Paused {
-        Style::new().dimmed()
-    } else {
-        Style::new()
-    };
-    Value::string(style.paint(title).to_string(), span)
-}
-
-fn render_desc(desc: &String, long: bool, span: Span) -> Value {
-    if desc.is_empty() {
-        render_empty(span)
-    } else if long {
-        Value::string(Style::new().paint(desc).to_string(), span)
-    } else {
-        render_truncated(span)
-    }
-}
-
-fn render_due(date: Option<NaiveDate>, status: &ToduStatus, span: Span) -> Value {
-    let Some(d) = date.and_then(|d| {
-        Local
-            .from_local_datetime(&d.and_hms_opt(0, 0, 0).unwrap())
-            .single()
-            .map(|dt| dt.fixed_offset())
-    }) else {
-        return render_empty(span);
-    };
-
-    if is_overdue(d) && status.is_active() {
-        Value::string(
-            Color::LightRed
-                .bold()
-                .underline()
-                .paint(d.date_naive().to_string())
-                .to_string(),
-            span,
-        )
-    } else {
-        Value::date(d, span)
     }
 }
 

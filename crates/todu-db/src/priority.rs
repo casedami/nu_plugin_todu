@@ -1,6 +1,6 @@
 use nu_ansi_term::{Color, Style};
 use nu_protocol::{ast::Operator, CustomValue, ShellError, Span, Value};
-use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
+use rusqlite::types::{ToSql, ToSqlOutput};
 
 use super::compare_ordering;
 use serde::{Deserialize, Serialize};
@@ -9,8 +9,6 @@ use std::cmp::Ordering;
 /// Priority level of a todo
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ToduPriority {
-    /// No priority
-    Unset,
     /// Low priority @!
     Low,
     /// Medium priority @!!
@@ -22,13 +20,12 @@ pub enum ToduPriority {
 impl ToduPriority {
     /// Parses a priority label string. Returns `None` for unrecognised values.
     pub(crate) fn from_str(s: &str) -> Option<Self> {
-        Some(match s {
-            "high" => Self::High,
-            "medium" => Self::Medium,
-            "low" => Self::Low,
-            s if s == "---" || s == "none" => Self::Unset,
-            _ => return None,
-        })
+        match s {
+            "high" => Some(Self::High),
+            "medium" => Some(Self::Medium),
+            "low" => Some(Self::Low),
+            _ => None,
+        }
     }
 
     /// Returns the canonical string label used for database storage and display
@@ -37,7 +34,6 @@ impl ToduPriority {
             Self::High => "high",
             Self::Medium => "medium",
             Self::Low => "low",
-            Self::Unset => "---",
         }
     }
 
@@ -46,7 +42,6 @@ impl ToduPriority {
             Self::High => Color::LightRed.bold(),
             Self::Medium => Color::LightYellow.normal(),
             Self::Low => Color::LightBlue.normal(),
-            Self::Unset => Color::LightGray.dimmed(),
         }
     }
 
@@ -125,11 +120,3 @@ impl ToSql for ToduPriority {
     }
 }
 
-impl FromSql for ToduPriority {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        value
-            .as_str()
-            .map(|s| ToduPriority::from_str(s).unwrap_or(ToduPriority::Unset))
-            .map_err(|e| FromSqlError::Other(Box::new(e)))
-    }
-}

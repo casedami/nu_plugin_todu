@@ -42,11 +42,11 @@ pub struct ParsedTodu {
     /// Task title
     pub title: String,
     /// Task priority
-    pub priority: ToduPriority,
+    pub priority: Option<ToduPriority>,
     /// Task due date
     pub due: Option<NaiveDate>,
-    /// Optionay task description
-    pub desc: String,
+    /// Optional task description
+    pub desc: Option<String>,
     /// Task parent (if any)
     pub pptid: Option<i64>,
     /// Task categorization tag
@@ -69,7 +69,7 @@ impl ToduLocalDatabase {
                 project     TEXT    NOT NULL,
                 title       TEXT    NOT NULL,
                 status      TEXT    NOT NULL DEFAULT 'pending',
-                priority    TEXT    NOT NULL DEFAULT 'unset',
+                priority    TEXT,
                 due         TEXT,
                 desc        TEXT,
                 created     INTEGER NOT NULL,
@@ -135,6 +135,22 @@ impl ToduLocalDatabase {
             .query_row(params![ptid, project], ToduRow::from_sql)
     }
 
+    /// Returns a single todo item with its full subtask tree
+    pub fn get_todo_tree(&self, ptid: i64, project: &str) -> SqlResult<ToduRow> {
+        let sql = format!(
+            "SELECT {} FROM todos WHERE project = ?1 AND deleted_at IS NULL ORDER BY ptid",
+            ToduRow::COLS
+        );
+        let flat = self
+            .conn
+            .prepare(&sql)?
+            .query_map(params![project], ToduRow::from_sql)?
+            .collect::<SqlResult<Vec<_>>>()?;
+        let mut tree = build_tree(flat);
+        sort_tree(&mut tree);
+        find_in_tree(&mut tree, ptid).ok_or(rusqlite::Error::QueryReturnedNoRows)
+    }
+
     /// Sets the status of `ptid` and propagates the change up to ancestor tasks
     pub fn set_todo_status(&self, ptid: i64, project: &str, status: ToduStatus) -> SqlResult<()> {
         self.conn.execute(
@@ -193,7 +209,7 @@ impl ToduLocalDatabase {
         self.conn.execute(
             "INSERT INTO todos (project, title, priority, status, due, desc, ptid, pptid, created, tag, source)
              VALUES (?1, ?2, ?3, 'pending', ?4, ?5, ?6, ?7, unixepoch('now'), ?8, ?9)",
-            params![project, todo.title, todo.priority, todo.due, todo.desc, next_ptid, todo.pptid, todo.tag, todo.source.label()],
+            params![project, todo.title, todo.priority.map(|p| p.label()), todo.due, todo.desc, next_ptid, todo.pptid, todo.tag, todo.source.label()],
         )?;
         self.get_todo(next_ptid, project)
     }
@@ -274,7 +290,7 @@ impl ToduLocalDatabase {
     }
 
     /// Updates the description of todo `ptid`
-    pub fn update_desc(&self, ptid: i64, project: &str, desc: &str) -> SqlResult<()> {
+    pub fn update_desc(&self, ptid: i64, project: &str, desc: Option<&str>) -> SqlResult<()> {
         self.conn.execute(
             "UPDATE todos SET desc = ?1 WHERE ptid = ?2 AND project = ?3",
             params![desc, ptid, project],
@@ -333,6 +349,19 @@ fn sort_tree(tasks: &mut [ToduRow]) {
     }
 }
 
+/// Removes and returns the node with `ptid` from anywhere in the tree
+fn find_in_tree(nodes: &mut Vec<ToduRow>, ptid: i64) -> Option<ToduRow> {
+    for i in 0..nodes.len() {
+        if nodes[i].ptid == ptid {
+            return Some(nodes.remove(i));
+        }
+        if let Some(found) = find_in_tree(&mut nodes[i].subtasks, ptid) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 /// Assembles a flat list of rows (ordered by `ptid`) into a parent-child tree
 fn build_tree(flat: Vec<ToduRow>) -> Vec<ToduRow> {
     let mut children: HashMap<i64, Vec<ToduRow>> = HashMap::new();
@@ -362,14 +391,14 @@ mod tests {
     use super::{sort_tree, ToduPriority, ToduRow, ToduSource, ToduStatus};
     use chrono::Utc;
 
-    fn make_row(ptid: i64, status: ToduStatus, priority: ToduPriority) -> ToduRow {
+    fn make_row(ptid: i64, status: ToduStatus, priority: Option<ToduPriority>) -> ToduRow {
         ToduRow {
             ptid,
             status,
             priority,
             title: String::new(),
             due: None,
-            desc: String::new(),
+            desc: None,
             created: Utc::now(),
             pptid: None,
             tag: None,
@@ -385,9 +414,9 @@ mod tests {
     #[test]
     fn sort_by_status() {
         let mut rows = vec![
-            make_row(1, ToduStatus::Done, ToduPriority::Unset),
-            make_row(2, ToduStatus::Pending, ToduPriority::Unset),
-            make_row(3, ToduStatus::InProgress, ToduPriority::Unset),
+            make_row(1, ToduStatus::Done, None),
+            make_row(2, ToduStatus::Pending, None),
+            make_row(3, ToduStatus::InProgress, None),
         ];
         sort_tree(&mut rows);
         assert_eq!(ptids(&rows), vec![3, 2, 1]);
@@ -396,10 +425,10 @@ mod tests {
     #[test]
     fn sort_by_priority_within_status() {
         let mut rows = vec![
-            make_row(1, ToduStatus::Pending, ToduPriority::Unset),
-            make_row(2, ToduStatus::Pending, ToduPriority::Low),
-            make_row(3, ToduStatus::Pending, ToduPriority::High),
-            make_row(4, ToduStatus::Pending, ToduPriority::Medium),
+            make_row(1, ToduStatus::Pending, None),
+            make_row(2, ToduStatus::Pending, Some(ToduPriority::Low)),
+            make_row(3, ToduStatus::Pending, Some(ToduPriority::High)),
+            make_row(4, ToduStatus::Pending, Some(ToduPriority::Medium)),
         ];
         sort_tree(&mut rows);
         assert_eq!(ptids(&rows), vec![3, 4, 2, 1]);
@@ -408,9 +437,9 @@ mod tests {
     #[test]
     fn sort_by_ptid_within_status_and_priority() {
         let mut rows = vec![
-            make_row(5, ToduStatus::Pending, ToduPriority::High),
-            make_row(2, ToduStatus::Pending, ToduPriority::High),
-            make_row(8, ToduStatus::Pending, ToduPriority::High),
+            make_row(5, ToduStatus::Pending, Some(ToduPriority::High)),
+            make_row(2, ToduStatus::Pending, Some(ToduPriority::High)),
+            make_row(8, ToduStatus::Pending, Some(ToduPriority::High)),
         ];
         sort_tree(&mut rows);
         assert_eq!(ptids(&rows), vec![2, 5, 8]);
@@ -418,11 +447,11 @@ mod tests {
 
     #[test]
     fn sort_subtasks_recursively() {
-        let mut parent = make_row(1, ToduStatus::InProgress, ToduPriority::Unset);
+        let mut parent = make_row(1, ToduStatus::InProgress, None);
         parent.subtasks = vec![
-            make_row(10, ToduStatus::Done, ToduPriority::Unset),
-            make_row(11, ToduStatus::Pending, ToduPriority::High),
-            make_row(12, ToduStatus::Pending, ToduPriority::Low),
+            make_row(10, ToduStatus::Done, None),
+            make_row(11, ToduStatus::Pending, Some(ToduPriority::High)),
+            make_row(12, ToduStatus::Pending, Some(ToduPriority::Low)),
         ];
         let mut rows = vec![parent];
         sort_tree(&mut rows);
