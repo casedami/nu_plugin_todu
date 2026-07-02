@@ -16,7 +16,7 @@ mod status;
 pub use add::ToduAdd;
 pub use branch::ToduBranch;
 pub use clear::ToduClear;
-pub use edit::{ToduDesc, ToduDue, ToduTag};
+pub use edit::{ToduDesc, ToduDue, ToduTag, ToduTitle};
 pub use get::ToduGet;
 pub use list::ToduList;
 pub use r#move::ToduMove;

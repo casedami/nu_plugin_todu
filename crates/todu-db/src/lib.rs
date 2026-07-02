@@ -280,6 +280,15 @@ impl ToduLocalDatabase {
         )
     }
 
+    /// Updates the title of todo `ptid`
+    pub fn update_title(&self, ptid: i64, project: &str, title: &str) -> SqlResult<()> {
+        self.conn.execute(
+            "UPDATE todos SET title = ?1 WHERE ptid = ?2 AND project = ?3",
+            params![title, ptid, project],
+        )?;
+        Ok(())
+    }
+
     /// Updates the tag on todo `ptid`
     pub fn update_tag(&self, ptid: i64, project: &str, tag: Option<&str>) -> SqlResult<()> {
         self.conn.execute(

@@ -120,6 +120,7 @@ impl Plugin for ToduPlugin {
             Box::new(ToduStop),
             Box::new(ToduPause),
             Box::new(ToduReopen),
+            Box::new(ToduTitle),
             Box::new(ToduDesc),
             Box::new(ToduDue),
             Box::new(ToduTag),

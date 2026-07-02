@@ -1,4 +1,56 @@
 use crate::{assert_todo_exists, db_err, parse_due, ToduPlugin};
+
+/// Struct for the `todu title` command
+pub struct ToduTitle;
+
+impl SimplePluginCommand for ToduTitle {
+    type Plugin = ToduPlugin;
+
+    fn name(&self) -> &str {
+        "todu title"
+    }
+    fn description(&self) -> &str {
+        "Edit the title of a todo"
+    }
+
+    fn signature(&self) -> Signature {
+        Signature::build("todu title")
+            .required("id", SyntaxShape::Int, "Todu ID")
+            .required("text", SyntaxShape::String, "New title text")
+            .switch(
+                "append",
+                "Append text to existing title instead of replacing",
+                Some('a'),
+            )
+            .switch("global", "Use home directory as project", Some('g'))
+            .input_output_type(Type::Nothing, Type::Any)
+            .category(Category::Custom("todu".into()))
+    }
+
+    fn run(
+        &self,
+        plugin: &ToduPlugin,
+        engine: &EngineInterface,
+        call: &EvaluatedCall,
+        _input: &Value,
+    ) -> Result<Value, LabeledError> {
+        let id: i64 = call.req(0)?;
+        let text: String = call.req(1)?;
+        let append = call.has_flag("append")?;
+        plugin.with_project(engine, call, |db, proj| {
+            assert_todo_exists(db, id, proj, call.positional[0].span())?;
+            let title = if append {
+                let existing = db.get_todo(id, proj).map_err(db_err)?;
+                format!("{} {text}", existing.title)
+            } else {
+                text.clone()
+            };
+            db.update_title(id, proj, &title).map_err(db_err)?;
+            let row = db.get_todo_tree(id, proj).map_err(db_err)?;
+            Ok(row.render_long(call.head))
+        })
+    }
+}
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{Category, LabeledError, Signature, SyntaxShape, Type, Value};
 
