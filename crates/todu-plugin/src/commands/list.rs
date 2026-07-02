@@ -68,6 +68,8 @@ impl SimplePluginCommand for ToduList {
                     .unwrap_or(0)
                     % EMPTY_MSGS.len();
                 Value::string(EMPTY_MSGS[idx], span)
+            } else if rows.len() == 1 {
+                rows[0].render_long(span)
             } else {
                 Value::list(rows.iter().map(|r| r.render_short(span)).collect(), span)
             };
