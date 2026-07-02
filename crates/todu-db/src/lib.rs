@@ -298,6 +298,46 @@ impl ToduLocalDatabase {
         Ok(())
     }
 
+    /// Updates the priority of todo `ptid`
+    pub fn update_priority(&self, ptid: i64, project: &str, priority: Option<ToduPriority>) -> SqlResult<()> {
+        self.conn.execute(
+            "UPDATE todos SET priority = ?1 WHERE ptid = ?2 AND project = ?3",
+            params![priority, ptid, project],
+        )?;
+        Ok(())
+    }
+
+    /// Updates the parent of todo `ptid`. Pass `None` to make it a root-level task
+    pub fn update_parent(&self, ptid: i64, project: &str, pptid: Option<i64>) -> SqlResult<()> {
+        self.conn.execute(
+            "UPDATE todos SET pptid = ?1 WHERE ptid = ?2 AND project = ?3",
+            params![pptid, ptid, project],
+        )?;
+        Ok(())
+    }
+
+    /// Returns `true` if `potential_ancestor` is an ancestor of `of_ptid` in `project`
+    pub fn is_ancestor_of(
+        &self,
+        potential_ancestor: i64,
+        of_ptid: i64,
+        project: &str,
+    ) -> SqlResult<bool> {
+        let mut current = of_ptid;
+        loop {
+            let parent: Option<i64> = self.conn.query_row(
+                "SELECT pptid FROM todos WHERE ptid = ?1 AND project = ?2",
+                params![current, project],
+                |row| row.get(0),
+            )?;
+            match parent {
+                None => return Ok(false),
+                Some(p) if p == potential_ancestor => return Ok(true),
+                Some(p) => current = p,
+            }
+        }
+    }
+
     /// Updates the due date of todo `ptid`
     pub fn update_due(&self, ptid: i64, project: &str, due: Option<NaiveDate>) -> SqlResult<()> {
         self.conn.execute(

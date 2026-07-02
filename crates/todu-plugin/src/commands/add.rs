@@ -89,7 +89,7 @@ impl PluginCommand for ToduAdd {
                     assert_todo_exists(db, parent_id, proj, *span)?;
                 }
                 let row = db.insert_todo(proj, &item).map_err(db_err)?;
-                rendered.push(row.render(head, false));
+                rendered.push(row.render(head, true));
             }
             let value = if rendered.len() == 1 {
                 rendered.remove(0)

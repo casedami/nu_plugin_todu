@@ -1,6 +1,7 @@
 use crate::{db_err, ToduPlugin};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{Category, LabeledError, Signature, Type, Value};
+use todu_db::ToduRow;
 
 const EMPTY_MSGS: &[&str] = &[
     "No todos — add one with: todu add <task>",
@@ -36,6 +37,7 @@ impl SimplePluginCommand for ToduList {
                 "Use home directory as project instead of git root",
                 Some('g'),
             )
+            .switch("overdue", "Show only overdue tasks", Some('o'))
             .input_output_type(Type::Nothing, Type::Any)
             .category(Category::Custom("todu".into()))
     }
@@ -47,10 +49,19 @@ impl SimplePluginCommand for ToduList {
         call: &EvaluatedCall,
         _input: &Value,
     ) -> Result<Value, LabeledError> {
+        let overdue: bool = call.has_flag("overdue")?;
         plugin.with_project(engine, call, |db, proj| {
             let rows = db.get_live_todos(proj).map_err(db_err)?;
             let span = call.head;
-            let result = if rows.is_empty() {
+            let result = if overdue {
+                let mut flat = Vec::new();
+                collect_overdue(&rows, &mut flat);
+                if flat.is_empty() {
+                    Value::string("No overdue todos", span)
+                } else {
+                    Value::list(flat.iter().map(|r| r.render(span, false)).collect(), span)
+                }
+            } else if rows.is_empty() {
                 let idx = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.subsec_nanos() as usize)
@@ -62,5 +73,14 @@ impl SimplePluginCommand for ToduList {
             };
             Ok(result)
         })
+    }
+}
+
+fn collect_overdue<'a>(rows: &'a [ToduRow], out: &mut Vec<&'a ToduRow>) {
+    for row in rows {
+        if row.is_overdue() {
+            out.push(row);
+        }
+        collect_overdue(&row.subtasks, out);
     }
 }

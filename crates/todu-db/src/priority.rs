@@ -19,7 +19,7 @@ pub enum ToduPriority {
 
 impl ToduPriority {
     /// Parses a priority label string. Returns `None` for unrecognised values.
-    pub(crate) fn from_str(s: &str) -> Option<Self> {
+    pub fn from_input(s: &str) -> Option<Self> {
         match s {
             "high" => Some(Self::High),
             "medium" => Some(Self::Medium),
@@ -50,7 +50,7 @@ impl ToduPriority {
     /// This allows things like `todo | where priority > low`.
     fn coerce(other: &Value) -> Option<Self> {
         match other {
-            Value::String { val, .. } => Self::from_str(val),
+            Value::String { val, .. } => Self::from_input(val),
             _ => None,
         }
     }
@@ -119,4 +119,3 @@ impl ToSql for ToduPriority {
         Ok(ToSqlOutput::from(self.label()))
     }
 }
-

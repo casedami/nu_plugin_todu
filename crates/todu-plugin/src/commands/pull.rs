@@ -174,9 +174,8 @@ fn fetch_jira_issues(
     token: &str,
     project: &str,
 ) -> Result<Vec<JiraIssue>, LabeledError> {
-    let jql = format!(
-        "project = {project} AND assignee = currentUser() AND statusCategory != Done"
-    );
+    let jql =
+        format!("project = {project} AND assignee = currentUser() AND statusCategory != Done");
 
     let client = reqwest::blocking::Client::new();
     let url = format!("{}/rest/api/3/search", base_url.trim_end_matches('/'));

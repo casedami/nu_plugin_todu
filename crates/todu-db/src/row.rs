@@ -44,7 +44,7 @@ impl ToduRow {
             priority: row
                 .get::<_, Option<String>>(1)?
                 .as_deref()
-                .and_then(ToduPriority::from_str),
+                .and_then(ToduPriority::from_input),
             status: row.get(2)?,
             title: row.get(3)?,
             due: row.get(4)?,
@@ -55,6 +55,17 @@ impl ToduRow {
             source: ToduSource::from_str(&row.get::<_, String>(9)?),
             subtasks: Vec::new(),
         })
+    }
+
+    /// Returns `true` if the item represented by this row is overdue
+    pub fn is_overdue(&self) -> bool {
+        self.status.is_active()
+            && self.due.is_some_and(|d| {
+                Local
+                    .from_local_datetime(&d.and_hms_opt(23, 59, 59).unwrap())
+                    .single()
+                    .is_some_and(|dt| is_overdue(dt.fixed_offset()))
+            })
     }
 
     /// Constructs a todu row for output
@@ -79,7 +90,35 @@ impl ToduRow {
             } else {
                 Style::new()
             };
-            Value::string(style.paint(&self.title).to_string(), span)
+
+            if long {
+                Value::string(style.paint(&self.title).to_string(), span)
+            } else {
+                let subtask_ratio = if !self.subtasks.is_empty() {
+                    let total = self
+                        .subtasks
+                        .iter()
+                        .filter(|s| s.status != ToduStatus::Stopped)
+                        .count();
+                    let done = self
+                        .subtasks
+                        .iter()
+                        .filter(|s| s.status == ToduStatus::Done)
+                        .count();
+                    style.dimmed().paint(format!(" {done}/{total}")).to_string()
+                } else {
+                    String::new()
+                };
+                let desc_suffix = if self.desc.is_some() {
+                    TRUNCATED.to_string()
+                } else {
+                    String::new()
+                };
+                let title_desc = style
+                    .paint(format!("{}{desc_suffix}", &self.title))
+                    .to_string();
+                Value::string(format!("{title_desc}{subtask_ratio}"), span)
+            }
         };
         rec.push("title", title);
         rec.push("status", Value::custom(Box::new(self.status), span));
@@ -95,41 +134,24 @@ impl ToduRow {
             rec.push("tag", Value::string(t.clone(), span));
         }
 
-        if !self.subtasks.is_empty() {
-            let subtasks_val = if long {
-                Value::list(
-                    self.subtasks
-                        .iter()
-                        .map(|s| s.render(span, false))
-                        .collect(),
-                    span,
-                )
-            } else {
-                let total = self
-                    .subtasks
-                    .iter()
-                    .filter(|s| s.status != ToduStatus::Stopped)
-                    .count();
-                let done = self
-                    .subtasks
-                    .iter()
-                    .filter(|s| s.status == ToduStatus::Done)
-                    .count();
-                Value::string(format!("{done}/{total}"), span)
-            };
-            rec.push("subtasks", subtasks_val);
-        }
-
-        if let Some(ref desc) = self.desc {
-            let desc_val = if long {
-                Value::string(desc.clone(), span)
-            } else {
-                Value::string(Style::new().dimmed().paint(TRUNCATED).to_string(), span)
-            };
-            rec.push("desc", desc_val);
-        }
-
         if long {
+            if !self.subtasks.is_empty() {
+                rec.push(
+                    "subtasks",
+                    Value::list(
+                        self.subtasks
+                            .iter()
+                            .map(|s| s.render(span, false))
+                            .collect(),
+                        span,
+                    ),
+                );
+            }
+
+            if let Some(ref desc) = self.desc {
+                rec.push("desc", Value::string(desc.clone(), span));
+            }
+
             rec.push("source", Value::string(self.source.label(), span));
             if let Some(parent) = self.pptid {
                 rec.push("parent", Value::int(parent, span));

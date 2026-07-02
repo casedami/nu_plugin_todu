@@ -113,6 +113,7 @@ impl Plugin for ToduPlugin {
         vec![
             Box::new(ToduList),
             Box::new(ToduGet),
+            Box::new(ToduBranch),
             Box::new(ToduAdd),
             Box::new(ToduDone),
             Box::new(ToduStart),
@@ -122,6 +123,8 @@ impl Plugin for ToduPlugin {
             Box::new(ToduDesc),
             Box::new(ToduDue),
             Box::new(ToduTag),
+            Box::new(ToduPriorityCmd),
+            Box::new(ToduMove),
             Box::new(ToduRm),
             Box::new(ToduClear),
             #[cfg(feature = "remote")]

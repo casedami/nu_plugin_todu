@@ -1,8 +1,11 @@
 mod add;
+mod branch;
 mod clear;
 mod edit;
 mod get;
 mod list;
+mod r#move;
+mod priority;
 mod rm;
 #[cfg(feature = "remote")]
 mod pull;
@@ -11,10 +14,13 @@ mod remote;
 mod status;
 
 pub use add::ToduAdd;
+pub use branch::ToduBranch;
 pub use clear::ToduClear;
 pub use edit::{ToduDesc, ToduDue, ToduTag};
 pub use get::ToduGet;
 pub use list::ToduList;
+pub use r#move::ToduMove;
+pub use priority::ToduPriorityCmd;
 pub use rm::ToduRm;
 #[cfg(feature = "remote")]
 pub use pull::{ToduPullGitHub, ToduPullJira};
