@@ -21,7 +21,7 @@ todu add "!!write tests for backend #tests @tomorrow // need more test cases for
 todu | sort-by status
 todu | group-by tag 
 todu | where priority > medium | get task desc
-todu | where status == "pending" | get id | todu tag work
+todu | where status == pending | get id | todu tag work
 todu add "refactor auth module" | [$"write unit tests ^($in.id)" $"update docs ^($in.id)"] | todu add
 ```
 

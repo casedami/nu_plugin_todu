@@ -4,16 +4,26 @@ use todu_db::{ParsedTodu, ToduPriority, ToduSource};
 
 /// Parses a date string in `YYYY-MM-DD` or natural-language form (e.g. `"friday"`, `"next week"`)
 pub fn parse_due(raw: &str) -> Result<Option<NaiveDate>, LabeledError> {
+    let now = Local::now();
     NaiveDate::parse_from_str(raw, "%Y-%m-%d")
         .or_else(|_| {
-            chrono_english::parse_date_string(raw, Local::now(), chrono_english::Dialect::Us)
+            chrono_english::parse_date_string(raw, now, chrono_english::Dialect::Us)
+                .map(|dt| dt.date_naive())
+                .map_err(|_| ())
+        })
+        .or_else(|_| {
+            if raw.contains(|c: char| c.is_ascii_digit()) {
+                return Err(());
+            }
+            let spaced = raw.replace('-', " ");
+            chrono_english::parse_date_string(&spaced, now, chrono_english::Dialect::Us)
                 .map(|dt| dt.date_naive())
                 .map_err(|_| ())
         })
         .map(Some)
         .map_err(|_| {
             LabeledError::new(format!(
-                "Invalid date '{raw}' — use YYYY-MM-DD or a natural date like 'friday', 'next week'"
+                "Invalid date '{raw}' — use YYYY-MM-DD or a natural date like 'friday', 'next-friday'"
             ))
         })
 }
@@ -127,6 +137,8 @@ mod tests {
     #[case("tomorrow")]
     #[case("next monday")]
     #[case("friday")]
+    #[case("next-monday")]
+    #[case("next-friday")]
     fn parse_due_natural_language_returns_some(#[case] input: &str) {
         assert!(parse_due(input).unwrap().is_some());
     }
