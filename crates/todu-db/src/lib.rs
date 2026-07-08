@@ -114,10 +114,10 @@ impl ToduLocalDatabase {
         Ok(tree)
     }
 
-    /// Returns `true` if a todo with `ptid` exists in `project` (including soft-deleted rows)
+    /// Returns `true` if a live (non-deleted) todo with `ptid` exists in `project`
     pub fn todo_exists(&self, ptid: i64, project: &str) -> SqlResult<bool> {
         let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM todos WHERE ptid = ?1 AND project = ?2",
+            "SELECT COUNT(*) FROM todos WHERE ptid = ?1 AND project = ?2 AND deleted_at IS NULL",
             params![ptid, project],
             |row| row.get(0),
         )?;
@@ -171,22 +171,22 @@ impl ToduLocalDatabase {
             return Ok(());
         };
 
-        let any_children_in_progress: bool = self.conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM todos WHERE pptid = ?1 AND project = ?2 AND status = ?3 AND deleted_at IS NULL)",
-            params![parent_id, project, ToduStatus::InProgress],
-            |row| row.get(0),
-        )?;
-
         let all_children_done: bool = self.conn.query_row(
             "SELECT NOT EXISTS(SELECT 1 FROM todos WHERE pptid = ?1 AND project = ?2 AND status != ?3 AND deleted_at IS NULL)",
             params![parent_id, project, ToduStatus::Done],
             |row| row.get(0),
         )?;
 
-        let new_status = if any_children_in_progress {
-            ToduStatus::InProgress
-        } else if all_children_done {
+        let any_children_in_progress_or_done: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM todos WHERE pptid = ?1 AND project = ?2 AND status IN (?3, ?4) AND deleted_at IS NULL)",
+            params![parent_id, project, ToduStatus::InProgress, ToduStatus::Done],
+            |row| row.get(0),
+        )?;
+
+        let new_status = if all_children_done {
             ToduStatus::InReview
+        } else if any_children_in_progress_or_done {
+            ToduStatus::InProgress
         } else {
             ToduStatus::Pending
         };
