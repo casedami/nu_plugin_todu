@@ -35,7 +35,13 @@ pub fn parse_due(raw: &str) -> Result<Option<NaiveDate>, LabeledError> {
 /// - `!` / `!!` / `!!!` — low / medium / high priority
 /// - `@date`  — due date (YYYY-MM-DD or natural language)
 pub fn parse_inline(input: &str) -> Result<ParsedTodu, LabeledError> {
-    let (task_part, desc_part) = input.split_once(" // ").unwrap_or((input, ""));
+    let (task_part, desc_part) = if input.starts_with("// ") {
+        ("", &input[3..])
+    } else if input == "//" {
+        ("", "")
+    } else {
+        input.split_once(" // ").unwrap_or((input, ""))
+    };
 
     let mut tag: Option<String> = None;
     let mut pptid: Option<i64> = None;
@@ -98,6 +104,12 @@ pub fn parse_inline(input: &str) -> Result<ParsedTodu, LabeledError> {
         Some(r) => r?,
         None => None,
     };
+
+    if title.is_empty() {
+        return Err(LabeledError::new(
+            "task title cannot be empty — add a title before the '//' description",
+        ));
+    }
 
     Ok(ParsedTodu {
         title,
@@ -234,6 +246,14 @@ mod tests {
     #[test]
     fn invalid_date_returns_error() {
         assert!(parse_inline("task @not-a-date").is_err());
+    }
+
+    #[rstest::rstest]
+    #[case("// something something")]
+    #[case("// ")]
+    #[case("// !!! #work")]
+    fn empty_title_returns_error(#[case] input: &str) {
+        assert!(parse_inline(input).is_err());
     }
 
     #[test]

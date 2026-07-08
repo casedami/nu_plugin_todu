@@ -138,7 +138,7 @@ impl ToduLocalDatabase {
     /// Returns a single todo item with its full subtask tree
     pub fn get_todo_tree(&self, ptid: i64, project: &str) -> SqlResult<ToduRow> {
         let sql = format!(
-            "SELECT {} FROM todos WHERE project = ?1 ORDER BY ptid",
+            "SELECT {} FROM todos WHERE project = ?1 AND deleted_at IS NULL ORDER BY ptid",
             ToduRow::COLS
         );
         let flat = self
