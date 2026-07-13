@@ -6,23 +6,31 @@ use todu_db::{ParsedTodu, ToduPriority, ToduSource};
 /// Parses a date string in `YYYY-MM-DD` or natural-language form (e.g. `"friday"`, `"in 3 days"`)
 pub fn parse_due(raw: &str) -> Result<Option<NaiveDate>, LabeledError> {
     let now = Local::now();
-    NaiveDate::parse_from_str(raw, "%Y-%m-%d")
-        .or_else(|_| {
-            let spaced = raw.replace('-', " ");
-            from_human_time(&spaced, now.naive_local())
-                .map(|r| match r {
-                    ParseResult::Date(d) => d,
-                    ParseResult::DateTime(dt) => dt.date(),
-                    ParseResult::Time(_) => now.date_naive(),
-                })
-                .map_err(|_| ())
-        })
-        .map(Some)
-        .map_err(|_| {
-            LabeledError::new(format!(
-                "Invalid date '{raw}' — use YYYY-MM-DD or a natural date like 'friday', 'next-friday'"
-            ))
-        })
+
+    if let Ok(d) = NaiveDate::parse_from_str(raw, "%Y-%m-%d") {
+        return Ok(Some(d));
+    }
+
+    let spaced = raw.replace('-', " ");
+    match from_human_time(&spaced, now.naive_local()) {
+        Ok(ParseResult::Date(d)) => Ok(Some(d)),
+        Ok(ParseResult::DateTime(dt)) => {
+            let date = dt.date();
+            if date == now.date_naive() {
+                Err(LabeledError::new(format!(
+                    "'{raw}' resolves to a time today, not a date — use 'today', 'tomorrow', or YYYY-MM-DD"
+                )))
+            } else {
+                Ok(Some(date))
+            }
+        }
+        Ok(ParseResult::Time(_)) => Err(LabeledError::new(format!(
+            "'{raw}' is a time-of-day, not a date — use 'today', 'tomorrow', or YYYY-MM-DD"
+        ))),
+        Err(_) => Err(LabeledError::new(format!(
+            "Invalid date '{raw}' — use YYYY-MM-DD or a natural date like 'friday', 'next-friday'"
+        ))),
+    }
 }
 
 /// Parses the inline task string format into a [`ParsedTodu`].
@@ -138,6 +146,8 @@ mod tests {
     #[case("")]
     #[case("2026-13-01")]
     #[case("2026-00-01")]
+    #[case("in-an-hour")]
+    #[case("in-2-hours")]
     fn parse_due_invalid_returns_err(#[case] input: &str) {
         assert!(parse_due(input).is_err());
     }
