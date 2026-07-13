@@ -71,12 +71,12 @@ impl SimplePluginCommand for ToduRemoteAddGitHub {
     }
 
     fn extra_description(&self) -> &str {
-        "Example: todu remote add github https://github.com/myorg/myrepo"
+        "Example: todu remote add github github.com/myorg/myrepo"
     }
 
     fn signature(&self) -> Signature {
         Signature::build("todu remote add github")
-            .required("url", SyntaxShape::String, "GitHub repo URL (https://github.com/owner/repo)")
+            .required("url", SyntaxShape::String, "GitHub repo URL (e.g. github.com/owner/repo)")
             .switch("global", "Use home directory as project", Some('g'))
             .input_output_type(Type::Nothing, Type::Any)
             .category(Category::Custom("todu".into()))
@@ -89,7 +89,10 @@ impl SimplePluginCommand for ToduRemoteAddGitHub {
         call: &EvaluatedCall,
         _input: &Value,
     ) -> Result<Value, LabeledError> {
-        let url: String = call.req(0)?;
+        let mut url: String = call.req(0)?;
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            url = format!("https://{url}");
+        }
         parse_github_url(&url)?;
 
         plugin.with_project(engine, call, |db, proj| {
@@ -122,13 +125,13 @@ impl SimplePluginCommand for ToduRemoteAddJira {
     }
 
     fn extra_description(&self) -> &str {
-        "The project key is required as a path segment in the URL.\n\
-         Example: todu remote add jira https://myorg.atlassian.net/PROJ"
+         "The project key is required as a path segment in the URL.\n\
+          Example: todu remote add jira myorg.atlassian.net/PROJ"
     }
 
     fn signature(&self) -> Signature {
         Signature::build("todu remote add jira")
-            .required("url", SyntaxShape::String, "Jira URL including project key (https://myorg.atlassian.net/PROJECT)")
+            .required("url", SyntaxShape::String, "Jira URL including project key (e.g. myorg.atlassian.net/PROJ)")
             .switch("global", "Use home directory as project", Some('g'))
             .input_output_type(Type::Nothing, Type::Any)
             .category(Category::Custom("todu".into()))
@@ -141,7 +144,10 @@ impl SimplePluginCommand for ToduRemoteAddJira {
         call: &EvaluatedCall,
         _input: &Value,
     ) -> Result<Value, LabeledError> {
-        let url: String = call.req(0)?;
+        let mut url: String = call.req(0)?;
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            url = format!("https://{url}");
+        }
         parse_jira_remote(&url)?;
 
         plugin.with_project(engine, call, |db, proj| {
