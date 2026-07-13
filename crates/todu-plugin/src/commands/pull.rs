@@ -215,17 +215,17 @@ impl SimplePluginCommand for ToduPullJira {
     }
 
     fn extra_description(&self) -> &str {
-        "Add remotes first with `todu remote add jira <url>`.\n\n\
-         Requires in config.nu:\n\
-         $env.config.plugins.todu = {\n\
-         \x20   jira: {\n\
-         \x20       email:      \"me@example.com\"\n\
-         \x20       project:    \"PROJ\"  # optional — omit to search all projects\n\
-         \x20       token_file: \"~/.config/todu/jira_token\"\n\
-         \x20   }\n\
-         }\n\n\
-         The Jira issue key is stored in the tag column (e.g. \"PROJ-123\").\n\
-         Status changes (todu done, todu start, etc.) are automatically pushed back via Jira transitions."
+         "Add remotes first with `todu remote add jira <url>`.\n\n\
+          Requires in config.nu:\n\
+          $env.config.plugins.todu = {\n\
+          \x20   jira: {\n\
+          \x20       email:      \"me@example.com\"\n\
+          \x20       token_file: \"~/.config/todu/jira_token\"\n\
+          \x20   }\n\
+          }\n\n\
+          The Jira project key is taken from the remote URL (e.g. myorg.atlassian.net/PROJ).\n\
+          The Jira issue key is stored in the tag column (e.g. \"PROJ-123\").\n\
+          Status changes (todu done, todu start, etc.) are automatically pushed back via Jira transitions."
     }
 
     fn signature(&self) -> Signature {

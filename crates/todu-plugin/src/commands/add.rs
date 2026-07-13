@@ -14,21 +14,21 @@ impl PluginCommand for ToduAdd {
         "todu add"
     }
     fn description(&self) -> &str {
-        "Add a new todo item the project"
+        "Add a new todo to the project"
     }
 
     fn extra_description(&self) -> &str {
-        "Priority tokens: @! low  @!! medium  @!!! high\n\n\
-         Inline syntax:\n\
-           todo add \"task // description\"             — inline description\n\
-           todo add \"task ->2026-07-01\"               — inline due date (must be last token)\n\
-           todo add \"task @!! #work ->fri // desc\"    — tokens before ->, date before //\n\
-           todo add \"task @!! // desc\"                — medium priority\n\
-           todo add \"task ^2 // desc\"                 — subtask of todo #2\n\
-           todo add \"task #work // desc\"              — tag the task\n\n\
-         Multiple todos:\n\
-            todo add \"task1\" \"task2\" \"task3\"\n\
-            [ \"task1\" \"task2\" \"task3\" ] | todo add"
+        "Inline syntax:\n\
+           \x20 todu add \"task // description\"             — inline description\n\
+           \x20 todu add \"task @2026-07-01\"                — inline due date\n\
+           \x20 todu add \"task ! #work @fri // desc\"       — low priority, tag, due date\n\
+           \x20 todu add \"task !! // desc\"                 — medium priority\n\
+           \x20 todu add \"task ^2 // desc\"                 — subtask of todo #2\n\
+           \x20 todu add \"task #work // desc\"              — tag the task\n\
+          \nPriority tokens: ! = low  !! = medium  !!! = high\n\
+          \nMultiple todos:\n\
+           \x20 todu add \"task1\" \"task2\" \"task3\"\n\
+           \x20 [ \"task1\" \"task2\" \"task3\" ] | todu add"
     }
 
     fn signature(&self) -> Signature {

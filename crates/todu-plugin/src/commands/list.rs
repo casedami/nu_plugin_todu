@@ -23,11 +23,11 @@ impl SimplePluginCommand for ToduList {
     }
 
     fn description(&self) -> &str {
-        "List all todos for the current directory"
+        "List all todos for the current project"
     }
 
     fn extra_description(&self) -> &str {
-        "Subcommands: add, get, start, done, stop, pause, reopen, due, desc, clear"
+        "Subcommands: add, branch, clear, desc, done, due, get, move, pause, priority, pull, remote, reopen, rm, start, stop, tag, title"
     }
 
     fn signature(&self) -> Signature {

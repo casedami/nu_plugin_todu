@@ -14,7 +14,7 @@ impl SimplePluginCommand for ToduBranch {
     }
 
     fn description(&self) -> &str {
-        "Create and switch to a git branch for a todo item"
+        "Create and switch to a git branch linked to a todo item"
     }
 
     fn signature(&self) -> Signature {
