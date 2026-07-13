@@ -173,12 +173,17 @@ fn fetch_jira_issues(
         format!("project = {project} AND assignee = currentUser() AND statusCategory != Done");
 
     let client = reqwest::blocking::Client::new();
-    let url = format!("{}/rest/api/3/search", base_url.trim_end_matches('/'));
+    let url = format!("{}/rest/api/3/search/jql", base_url.trim_end_matches('/'));
+    let body = serde_json::json!({
+        "jql": jql,
+        "maxResults": 100
+    });
     let resp = client
-        .get(&url)
-        .query(&[("jql", &jql), ("maxResults", &"100".to_owned())])
+        .post(&url)
         .basic_auth(email, Some(token))
         .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .json(&body)
         .send()
         .map_err(|e| LabeledError::new(format!("Jira request failed: {e}")))?;
 
