@@ -27,6 +27,8 @@ pub struct ToduRow {
     pub pptid: Option<i64>,
     /// Optional tag associated with the task
     pub tag: Option<String>,
+    /// Optional branch name associated with the task
+    pub branch: Option<String>,
     /// Source of the task (local/remote)
     pub source: ToduSource,
     /// Subtasks (if any)
@@ -35,7 +37,7 @@ pub struct ToduRow {
 
 impl ToduRow {
     pub(super) const COLS: &'static str =
-        "ptid, priority, status, title, due, desc, pptid, created, tag, source";
+        "ptid, priority, status, title, due, desc, pptid, created, tag, source, branch";
 
     /// Deserializes a SQLite row into a `ToduRow`
     pub(super) fn from_sql(row: &Row) -> SqlResult<Self> {
@@ -53,6 +55,7 @@ impl ToduRow {
             created: DateTime::<Utc>::from_timestamp(row.get::<_, i64>(7)?, 0).unwrap_or_default(),
             tag: row.get(8)?,
             source: ToduSource::from_str(&row.get::<_, String>(9)?),
+            branch: row.get(10)?,
             subtasks: Vec::new(),
         })
     }
@@ -140,6 +143,9 @@ impl ToduRow {
         if let Some(ref t) = self.tag {
             rec.push("tag", Value::string(t.clone(), span));
         }
+        if let Some(ref b) = self.branch {
+            rec.push("branch", Value::string(b.clone(), span));
+        }
         Value::record(rec, span)
     }
 
@@ -159,6 +165,9 @@ impl ToduRow {
         }
         if let Some(ref t) = self.tag {
             rec.push("tag", Value::string(t.clone(), span));
+        }
+        if let Some(ref b) = self.branch {
+            rec.push("branch", Value::string(b.clone(), span));
         }
         if let Some(subtasks) = self.render_subtasks(span) {
             rec.push("subtasks", subtasks);

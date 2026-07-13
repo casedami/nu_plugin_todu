@@ -1,4 +1,4 @@
-use crate::{assert_todo_exists, ToduPlugin};
+use crate::{assert_todo_exists, db_err, ToduPlugin};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{Category, LabeledError, Signature, SyntaxShape, Type, Value};
 use std::process::Command;
@@ -72,6 +72,8 @@ impl SimplePluginCommand for ToduBranch {
                     stderr.trim()
                 )));
             }
+
+            db.update_branch(id, proj, Some(&branch_name)).map_err(db_err)?;
 
             Ok(Value::string(
                 format!("Switched to new branch '{branch_name}'"),

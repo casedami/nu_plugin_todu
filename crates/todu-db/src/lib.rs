@@ -76,9 +76,11 @@ impl ToduLocalDatabase {
                 pptid       INTEGER,
                 tag         TEXT,
                 source      TEXT    NOT NULL DEFAULT 'local',
-                deleted_at  INTEGER
+                deleted_at  INTEGER,
+                branch      TEXT
             );",
         )?;
+
         #[cfg(feature = "remote")]
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS remotes (
@@ -356,6 +358,15 @@ impl ToduLocalDatabase {
         Ok(())
     }
 
+    /// Updates the branch name of todo `ptid`
+    pub fn update_branch(&self, ptid: i64, project: &str, branch: Option<&str>) -> SqlResult<()> {
+        self.conn.execute(
+            "UPDATE todos SET branch = ?1 WHERE ptid = ?2 AND project = ?3",
+            params![branch, ptid, project],
+        )?;
+        Ok(())
+    }
+
     /// Soft-deletes all `Done` and `Stopped` todos in `project`. Returns the number of rows affected
     pub fn clear_done(&self, project: &str) -> SqlResult<usize> {
         self.conn.execute(
@@ -451,6 +462,7 @@ mod tests {
             created: Utc::now(),
             pptid: None,
             tag: None,
+            branch: None,
             source: ToduSource::Local,
             subtasks: vec![],
         }
