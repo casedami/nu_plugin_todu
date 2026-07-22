@@ -6,7 +6,7 @@ A [Nushell](https://www.nushell.sh/) plugin for managing project-scoped todos, w
 
 - Intuitive inline parsing for quick task creation with natural-language dates
 
-```nu
+```nushell
 todu add "!!write tests for backend #tests @tomorrow // need more test cases for feature"
 ╭───┬─────────────────────────┬─────────┬──────────┬──────┬────────────┬──────────┬───────╮
 │ # │          task           │ status  │ priority │ desc │    due     │ subtasks │  tag  │
@@ -17,7 +17,7 @@ todu add "!!write tests for backend #tests @tomorrow // need more test cases for
 
 - Integrates with Nushell pipelines for powerful task management
 
-```nu
+```nushell
 todu | sort-by status
 todu | group-by tag? 
 todu | where priority? > medium | get task desc
