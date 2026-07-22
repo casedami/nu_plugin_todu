@@ -46,3 +46,32 @@ pub(crate) fn collect_ids(
             .collect(),
     }
 }
+
+/// Collects the value (always the first positional argument) and the id(s) it should be applied
+/// to, for edit commands shaped like `todu <cmd> <value> [ids...]`. IDs may be given as trailing
+/// positional arguments or piped in (e.g. `todu | get id | todu tag work`); explicit trailing ids
+/// take priority if both are present.
+pub(crate) fn collect_value_and_ids(
+    call: &EvaluatedCall,
+    input: PipelineData,
+    label: &str,
+) -> Result<(String, Vec<i64>), LabeledError> {
+    let value: String = call.req(0)?;
+    let rest_ids: Vec<i64> = call.rest(1)?;
+    let ids = if !rest_ids.is_empty() {
+        rest_ids
+    } else {
+        match input {
+            PipelineData::Empty => {
+                return Err(LabeledError::new(format!(
+                    "todu {label} requires an id (or pipe ids in)"
+                )))
+            }
+            _ => input
+                .into_iter()
+                .map(|v| v.as_int().map_err(|e| LabeledError::new(e.to_string())))
+                .collect::<Result<_, _>>()?,
+        }
+    };
+    Ok((value, ids))
+}

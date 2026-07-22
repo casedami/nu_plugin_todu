@@ -38,6 +38,7 @@ impl PluginCommand for ToduAdd {
             .input_output_types(vec![
                 (Type::Nothing, Type::Any),
                 (Type::List(Box::new(Type::String)), Type::Any),
+                (Type::Any, Type::Any),
             ])
             .category(Category::Custom("todu".into()))
     }

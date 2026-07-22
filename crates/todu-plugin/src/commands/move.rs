@@ -1,11 +1,12 @@
+use super::collect_value_and_ids;
 use crate::{assert_todo_exists, db_err, ToduPlugin};
-use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{Category, LabeledError, Signature, SyntaxShape, Type, Value};
+use nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
+use nu_protocol::{Category, LabeledError, PipelineData, Signature, SyntaxShape, Type, Value};
 
 /// Struct for the `todu move` command
 pub struct ToduMove;
 
-impl SimplePluginCommand for ToduMove {
+impl PluginCommand for ToduMove {
     type Plugin = ToduPlugin;
 
     fn name(&self) -> &str {
@@ -18,14 +19,20 @@ impl SimplePluginCommand for ToduMove {
 
     fn signature(&self) -> Signature {
         Signature::build("todu move")
-            .required("id", SyntaxShape::Int, "Todu ID to reparent")
             .required(
                 "parent",
                 SyntaxShape::String,
                 "New parent ID, or \"none\"/0 to unparent",
             )
+            .rest(
+                "ids",
+                SyntaxShape::Int,
+                "Todu ID(s) to reparent (or pipe ids in)",
+            )
             .switch("global", "Use home directory as project", Some('g'))
             .input_output_type(Type::Nothing, Type::Any)
+            .input_output_type(Type::Int, Type::Any)
+            .input_output_type(Type::List(Box::new(Type::Int)), Type::Any)
             .category(Category::Custom("todu".into()))
     }
 
@@ -34,10 +41,9 @@ impl SimplePluginCommand for ToduMove {
         plugin: &ToduPlugin,
         engine: &EngineInterface,
         call: &EvaluatedCall,
-        _input: &Value,
-    ) -> Result<Value, LabeledError> {
-        let id: i64 = call.req(0)?;
-        let parent_str: String = call.req(1)?;
+        input: PipelineData,
+    ) -> Result<PipelineData, LabeledError> {
+        let (parent_str, ids) = collect_value_and_ids(call, input, "move")?;
 
         let new_parent: Option<i64> = if parent_str.is_empty()
             || parent_str.eq_ignore_ascii_case("none")
@@ -49,31 +55,41 @@ impl SimplePluginCommand for ToduMove {
                 LabeledError::new(format!(
                     "invalid parent \"{parent_str}\" — expected an ID, 0, or \"none\""
                 ))
-                .with_label("invalid parent", call.positional[1].span())
+                .with_label("invalid parent", call.positional[0].span())
             })?;
             Some(n)
         };
 
         plugin.with_project(engine, call, |db, proj| {
-            assert_todo_exists(db, id, proj, call.positional[0].span())?;
+            let head = call.head;
+            let mut rendered = Vec::new();
+            for id in &ids {
+                assert_todo_exists(db, *id, proj, head)?;
 
-            if let Some(parent_id) = new_parent {
-                if parent_id == id {
-                    return Err(LabeledError::new("a todo cannot be its own parent")
-                        .with_label("same as id", call.positional[1].span()));
+                if let Some(parent_id) = new_parent {
+                    if parent_id == *id {
+                        return Err(LabeledError::new("a todo cannot be its own parent")
+                            .with_label("same as id", head));
+                    }
+                    assert_todo_exists(db, parent_id, proj, head)?;
+                    if db.is_ancestor_of(*id, parent_id, proj).map_err(db_err)? {
+                        return Err(LabeledError::new(format!(
+                            "todo #{parent_id} is a descendant of #{id} — moving would create a cycle"
+                        ))
+                        .with_label("would create cycle", head));
+                    }
                 }
-                assert_todo_exists(db, parent_id, proj, call.positional[1].span())?;
-                if db.is_ancestor_of(id, parent_id, proj).map_err(db_err)? {
-                    return Err(LabeledError::new(format!(
-                        "todo #{parent_id} is a descendant of #{id} — moving would create a cycle"
-                    ))
-                    .with_label("would create cycle", call.positional[1].span()));
-                }
+
+                db.update_parent(*id, proj, new_parent).map_err(db_err)?;
+                let row = db.get_todo_tree(*id, proj).map_err(db_err)?;
+                rendered.push(row.render_long(head));
             }
-
-            db.update_parent(id, proj, new_parent).map_err(db_err)?;
-            let row = db.get_todo_tree(id, proj).map_err(db_err)?;
-            Ok(row.render_long(call.head))
+            let value = if rendered.len() == 1 {
+                rendered.remove(0)
+            } else {
+                Value::list(rendered, head)
+            };
+            Ok(PipelineData::Value(value, None))
         })
     }
 }
