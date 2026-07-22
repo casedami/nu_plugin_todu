@@ -8,7 +8,7 @@ remote = []
 
 [dependencies]
 nu-ansi-term = "0.50"
-nu-protocol = { version = "0.113.0", features = ["plugin"] }
+nu-protocol = { version = "0.114.0", features = ["plugin"] }
 chrono = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 typetag = "0.2"

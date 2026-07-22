@@ -367,11 +367,21 @@ impl ToduLocalDatabase {
         Ok(())
     }
 
-    /// Soft-deletes all `Done` and `Stopped` todos in `project`. Returns the number of rows affected
+    /// Soft-deletes all `Done` and `Stopped` todos in `project`. A subtask is only cleared
+    /// if its parent is also `Done`/`Stopped`; root-level todos are cleared unconditionally.
+    /// Returns the number of rows affected
     pub fn clear_done(&self, project: &str) -> SqlResult<usize> {
         self.conn.execute(
             "UPDATE todos SET deleted_at = unixepoch('now')
-             WHERE status IN (?2, ?3) AND project = ?1 AND deleted_at IS NULL",
+             WHERE status IN (?2, ?3) AND project = ?1 AND deleted_at IS NULL
+             AND (
+                 pptid IS NULL
+                 OR EXISTS (
+                     SELECT 1 FROM todos p
+                     WHERE p.ptid = todos.pptid AND p.project = todos.project
+                     AND p.status IN (?2, ?3)
+                 )
+             )",
             params![project, ToduStatus::Done, ToduStatus::Stopped],
         )
     }
