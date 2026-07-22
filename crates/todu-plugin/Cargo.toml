@@ -11,8 +11,8 @@ todu-db = { path = "../todu-db" }
 chrono = "0.4"
 human-date-parser = "0.3.1"
 nu-ansi-term = "0.50"
-nu-plugin = "0.113.0"
-nu-protocol = { version = "0.113.0", features = ["plugin"] }
+nu-plugin = "0.114.0"
+nu-protocol = { version = "0.114.0", features = ["plugin"] }
 reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false, optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }

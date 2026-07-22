@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 todu-plugin = { path = "../todu-plugin" }
-nu-plugin = "0.113.0"
+nu-plugin = "0.114.0"
 
 [lints]
 workspace = true
