@@ -101,14 +101,28 @@ impl ToduLocalDatabase {
         Self::init(Connection::open(path)?)
     }
 
-    /// Returns all non-deleted todos in `project` as a nested parent-child tree, sorted by status, priority, then `ptid`
+    /// Returns all non-archived todos in `project` as a nested parent-child tree, sorted by status, priority, then `ptid`
     pub fn get_live_todos(&self, project: &str) -> SqlResult<Vec<ToduRow>> {
-        let sql = format!(
-            "SELECT {} FROM todos WHERE project = ?1 AND deleted_at IS NULL ORDER BY ptid",
-            ToduRow::COLS
-        );
-        let mut stmt = self.conn.prepare(&sql)?;
-        let flat = stmt
+        self.todo_tree(project, false)
+    }
+
+    /// Returns every todo in `project`, live and archived, as a nested parent-child tree
+    pub fn get_all_todos(&self, project: &str) -> SqlResult<Vec<ToduRow>> {
+        self.todo_tree(project, true)
+    }
+
+    fn todo_tree(&self, project: &str, include_archived: bool) -> SqlResult<Vec<ToduRow>> {
+        let sql = if include_archived {
+            format!("SELECT {} FROM todos WHERE project = ?1 ORDER BY ptid", ToduRow::COLS)
+        } else {
+            format!(
+                "SELECT {} FROM todos WHERE project = ?1 AND deleted_at IS NULL ORDER BY ptid",
+                ToduRow::COLS
+            )
+        };
+        let flat = self
+            .conn
+            .prepare(&sql)?
             .query_map(params![project], ToduRow::from_sql)?
             .collect::<SqlResult<Vec<_>>>()?;
         let mut tree = build_tree(flat);
@@ -116,10 +130,10 @@ impl ToduLocalDatabase {
         Ok(tree)
     }
 
-    /// Returns `true` if a live (non-deleted) todo with `ptid` exists in `project`
+    /// Returns `true` if a todo with `ptid` exists in `project`, archived or not
     pub fn todo_exists(&self, ptid: i64, project: &str) -> SqlResult<bool> {
         let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM todos WHERE ptid = ?1 AND project = ?2 AND deleted_at IS NULL",
+            "SELECT COUNT(*) FROM todos WHERE ptid = ?1 AND project = ?2",
             params![ptid, project],
             |row| row.get(0),
         )?;
@@ -137,29 +151,24 @@ impl ToduLocalDatabase {
             .query_row(params![ptid, project], ToduRow::from_sql)
     }
 
-    /// Returns a single todo item with its full subtask tree
+    /// Returns a single todo item with its full subtask tree, whether archived or not
     pub fn get_todo_tree(&self, ptid: i64, project: &str) -> SqlResult<ToduRow> {
-        let sql = format!(
-            "SELECT {} FROM todos WHERE project = ?1 AND deleted_at IS NULL ORDER BY ptid",
-            ToduRow::COLS
-        );
-        let flat = self
-            .conn
-            .prepare(&sql)?
-            .query_map(params![project], ToduRow::from_sql)?
-            .collect::<SqlResult<Vec<_>>>()?;
-        let mut tree = build_tree(flat);
-        sort_tree(&mut tree);
+        let mut tree = self.todo_tree(project, true)?;
         find_in_tree(&mut tree, ptid).ok_or(rusqlite::Error::QueryReturnedNoRows)
     }
 
-    /// Sets the status of `ptid` and propagates the change up to ancestor tasks
+    /// Sets the status of `ptid`, propagates the change up to ancestor tasks, and archives
+    /// `ptid` (and any other now-eligible todos) if the new status is `Done` or `Stopped`
     pub fn set_todo_status(&self, ptid: i64, project: &str, status: ToduStatus) -> SqlResult<()> {
         self.conn.execute(
             "UPDATE todos SET status = ?1 WHERE ptid = ?2 AND project = ?3",
             params![status, ptid, project],
         )?;
-        self.sync_parent_status(ptid, project)
+        self.sync_parent_status(ptid, project)?;
+        if matches!(status, ToduStatus::Done | ToduStatus::Stopped) {
+            self.clear_done(project)?;
+        }
+        Ok(())
     }
 
     fn sync_parent_status(&self, ptid: i64, project: &str) -> SqlResult<()> {
@@ -407,6 +416,15 @@ impl ToduLocalDatabase {
         self.conn.execute(
             "DELETE FROM todos WHERE deleted_at IS NOT NULL AND project = ?1",
             params![project],
+        )
+    }
+
+    /// Permanently removes a single todo by `ptid`, archived or not. Returns the number of rows
+    /// deleted (0 if not found)
+    pub fn purge_todo(&self, ptid: i64, project: &str) -> SqlResult<usize> {
+        self.conn.execute(
+            "DELETE FROM todos WHERE ptid = ?1 AND project = ?2",
+            params![ptid, project],
         )
     }
 }

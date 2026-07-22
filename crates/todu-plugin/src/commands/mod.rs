@@ -6,7 +6,6 @@ mod get;
 mod list;
 mod r#move;
 mod priority;
-mod rm;
 #[cfg(feature = "remote")]
 mod pull;
 #[cfg(feature = "remote")]
@@ -21,7 +20,6 @@ pub use get::ToduGet;
 pub use list::ToduList;
 pub use r#move::ToduMove;
 pub use priority::ToduPriorityCmd;
-pub use rm::ToduRm;
 #[cfg(feature = "remote")]
 pub use pull::{ToduPullGitHub, ToduPullJira};
 #[cfg(feature = "remote")]

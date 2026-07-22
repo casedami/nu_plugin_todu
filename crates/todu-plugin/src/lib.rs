@@ -126,7 +126,6 @@ impl Plugin for ToduPlugin {
             Box::new(ToduTag),
             Box::new(ToduPriorityCmd),
             Box::new(ToduMove),
-            Box::new(ToduRm),
             Box::new(ToduClear),
             #[cfg(feature = "remote")]
             Box::new(ToduRemoteList),

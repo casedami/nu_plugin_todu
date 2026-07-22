@@ -23,11 +23,11 @@ impl SimplePluginCommand for ToduList {
     }
 
     fn description(&self) -> &str {
-        "List all todos for the current project"
+        "List live todos for the current project. Pass --all to include archived (done/stopped) todos too"
     }
 
     fn extra_description(&self) -> &str {
-        "Subcommands: add, branch, clear, desc, done, due, get, move, pause, priority, pull, remote, reopen, rm, start, stop, tag, title"
+        "Subcommands: add, branch, clear, desc, done, due, get, move, pause, priority, pull, remote, reopen, start, stop, tag, title"
     }
 
     fn signature(&self) -> Signature {
@@ -38,6 +38,7 @@ impl SimplePluginCommand for ToduList {
                 Some('g'),
             )
             .switch("overdue", "Show only overdue tasks", Some('o'))
+            .switch("all", "Include archived (done/stopped) todos", Some('a'))
             .input_output_type(Type::Nothing, Type::Any)
             .category(Category::Custom("todu".into()))
     }
@@ -50,8 +51,14 @@ impl SimplePluginCommand for ToduList {
         _input: &Value,
     ) -> Result<Value, LabeledError> {
         let overdue: bool = call.has_flag("overdue")?;
+        let all: bool = call.has_flag("all")?;
         plugin.with_project(engine, call, |db, proj| {
-            let rows = db.get_live_todos(proj).map_err(db_err)?;
+            let rows = if all {
+                db.get_all_todos(proj)
+            } else {
+                db.get_live_todos(proj)
+            }
+            .map_err(db_err)?;
             let span = call.head;
             let result = if overdue {
                 let mut flat = Vec::new();
