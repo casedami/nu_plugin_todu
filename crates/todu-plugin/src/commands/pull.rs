@@ -2,8 +2,9 @@ use crate::remote::{cfg_str, parse_github_url, parse_jira_remote, resolve_token}
 use crate::{db_err, ToduPlugin};
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{Category, LabeledError, Signature, Type, Value};
+use chrono::NaiveDate;
 use serde::Deserialize;
-use todu_db::{ParsedTodu, ToduSource};
+use todu_db::{ParsedTodu, ToduPriority, ToduSource};
 
 #[derive(Deserialize)]
 struct GitHubIssue {
@@ -160,6 +161,23 @@ struct JiraIssue {
 #[derive(Deserialize)]
 struct JiraFields {
     summary: String,
+    duedate: Option<String>,
+    priority: Option<JiraPriority>,
+}
+
+#[derive(Deserialize)]
+struct JiraPriority {
+    name: String,
+}
+
+/// Maps a Jira priority name (Jira's default scheme has 5 levels) onto todu's 3-level scheme
+fn map_jira_priority(name: &str) -> Option<ToduPriority> {
+    match name {
+        "Highest" | "High" => Some(ToduPriority::High),
+        "Medium" => Some(ToduPriority::Medium),
+        "Low" | "Lowest" => Some(ToduPriority::Low),
+        _ => None,
+    }
 }
 
 /// Fetches assigned, non-done issues via the Jira REST API scoped to `project`
@@ -176,7 +194,8 @@ fn fetch_jira_issues(
     let url = format!("{}/rest/api/3/search/jql", base_url.trim_end_matches('/'));
     let body = serde_json::json!({
         "jql": jql,
-        "maxResults": 100
+        "maxResults": 100,
+        "fields": ["summary", "duedate", "priority"]
     });
     let resp = client
         .post(&url)
@@ -268,11 +287,28 @@ impl SimplePluginCommand for ToduPullJira {
                 for issue in fetch_jira_issues(base_url, &email, &token, project)? {
                     let tag = issue.key;
                     let source = ToduSource::Jira(remote.url.clone());
-                    if db
+                    let due = issue
+                        .fields
+                        .duedate
+                        .as_deref()
+                        .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok());
+                    let priority = issue
+                        .fields
+                        .priority
+                        .as_ref()
+                        .and_then(|p| map_jira_priority(&p.name));
+
+                    if let Some(existing) = db
                         .find_todo_by_tag_and_source(proj, &tag, source.clone())
                         .map_err(db_err)?
-                        .is_some()
                     {
+                        if existing.due != due {
+                            db.update_due(existing.ptid, proj, due).map_err(db_err)?;
+                        }
+                        if existing.priority != priority {
+                            db.update_priority(existing.ptid, proj, priority)
+                                .map_err(db_err)?;
+                        }
                         skipped += 1;
                         continue;
                     }
@@ -281,8 +317,8 @@ impl SimplePluginCommand for ToduPullJira {
                             proj,
                             &ParsedTodu {
                                 title: issue.fields.summary,
-                                priority: None,
-                                due: None,
+                                priority,
+                                due,
                                 desc: None,
                                 pptid: None,
                                 tag: Some(tag),
